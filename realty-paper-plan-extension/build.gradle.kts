@@ -5,12 +5,12 @@ plugins {
 }
 
 dependencies {
-    compileOnly(project(":realty-backend"))
+    compileOnly(project(":realty-backend-api"))
     compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
     compileOnly("com.github.plan-player-analytics:Plan:5.7.3306")
     compileOnly("org.jetbrains:annotations:26.0.2-1")
 
-    testImplementation(project(":realty-backend"))
+    testImplementation(project(":realty-backend-api"))
     testImplementation("com.github.plan-player-analytics:Plan:5.7.3306")
 }
 

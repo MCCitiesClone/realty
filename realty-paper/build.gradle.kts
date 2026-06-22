@@ -7,6 +7,7 @@ plugins {
 
 dependencies {
     api(project(":realty-paper-api"))
+    implementation(project(":realty-backend"))
     compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7") {
         exclude(group = "org.bukkit", module = "bukkit")
@@ -24,13 +25,13 @@ dependencies {
         exclude(group = "org.bukkit", module = "bukkit")
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
-    compileOnly("net.democracycraft:treasury-api:2.0.0")
+    compileOnly("io.paradaux:treasury-api:2.2.1-SNAPSHOT")
     compileOnly("org.jetbrains:annotations:26.0.2-1")
     implementation("org.incendo:cloud-paper:2.0.0-beta.10")
     implementation("org.spongepowered:configurate-yaml:4.2.0")
 
     testImplementation("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
-    testImplementation("net.democracycraft:treasury-api:2.0.0")
+    testImplementation("io.paradaux:treasury-api:2.2.1-SNAPSHOT")
     testImplementation("org.mockito:mockito-core:5.15.2")
     testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
     testImplementation("com.github.MilkBowl:VaultAPI:1.7") {

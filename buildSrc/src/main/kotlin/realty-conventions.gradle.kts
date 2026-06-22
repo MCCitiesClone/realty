@@ -7,7 +7,10 @@ version = "1.3.3"
 
 val targetJavaVersion = 21
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(targetJavaVersion))
+java {
+    sourceCompatibility = JavaVersion.toVersion(targetJavaVersion)
+    targetCompatibility = JavaVersion.toVersion(targetJavaVersion)
+}
 
 repositories {
     mavenLocal()
