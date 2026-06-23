@@ -3,7 +3,11 @@ plugins {
 }
 
 group = "io.github.md5sha256"
+<<<<<<< HEAD
 version = "1.4.1"
+=======
+version = "1.3.4"
+>>>>>>> e84f865 (chore(release): v1.3.4 [skip ci])
 
 val targetJavaVersion = 21
 
