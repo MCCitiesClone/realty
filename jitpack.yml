@@ -1,0 +1,5 @@
+# Realty targets Java 21, but JitPack defaults to JDK 8. Pin the build JDK so the
+# on-demand JitPack build of the published modules (realty-*-api, realty-backend)
+# succeeds for consumers such as PostmanPat.
+jdk:
+  - openjdk21
