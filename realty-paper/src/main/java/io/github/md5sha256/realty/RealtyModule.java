@@ -25,7 +25,6 @@ import io.github.md5sha256.realty.wand.SubregionWandManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
 
 /**
  * Binds Realty's services into Guice.
@@ -44,7 +43,6 @@ import java.util.logging.Logger;
 public final class RealtyModule extends AbstractModule {
 
     private final Realty plugin;
-    private final Logger logger;
     private final Message messages;
     private final AtomicReference<Settings> settings;
     private final AtomicReference<RegionProfileSettings> regionProfileSettings;
@@ -88,7 +86,6 @@ public final class RealtyModule extends AbstractModule {
                  @NotNull SubregionWand subregionWand,
                  @NotNull SubregionWandManager subregionWandManager) {
         this.plugin = plugin;
-        this.logger = plugin.getLogger();
         this.messages = messages;
         this.settings = settings;
         this.regionProfileSettings = regionProfileSettings;
@@ -114,7 +111,9 @@ public final class RealtyModule extends AbstractModule {
     @Override
     protected void configure() {
         bind(Realty.class).toInstance(this.plugin);
-        bind(Logger.class).toInstance(this.logger);
+        // Deliberately no Logger binding: Guice supplies one of its own, and binding it here
+        // as well fails injector creation with "Logger was bound multiple times". A class
+        // that wants the plugin's logger injects Realty and asks for it.
         bind(Message.class).toInstance(this.messages);
         bind(ExecutorState.class).toInstance(this.executorState);
         bind(Database.class).toInstance(this.database);

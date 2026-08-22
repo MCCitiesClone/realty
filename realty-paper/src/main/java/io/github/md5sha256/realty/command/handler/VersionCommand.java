@@ -15,16 +15,19 @@ import org.jetbrains.annotations.NotNull;
 @Command({"realty", "rl"})
 public final class VersionCommand implements CommandHandler {
 
-    private final String version;
+    private final Realty plugin;
 
     @Inject
     public VersionCommand(@NotNull Realty plugin) {
-        this.version = plugin.getPluginMeta().getVersion();
+        this.plugin = plugin;
     }
 
     @Route("version")
     @Description("Show the installed Realty version")
     public void version(@Sender CommandSender sender) {
-        sender.sendMessage(Component.text("Running Realty version " + this.version));
+        // Read on use rather than at construction: a handler should not depend on how much
+        // of the plugin exists when the injector builds it.
+        sender.sendMessage(Component.text(
+                "Running Realty version " + this.plugin.getPluginMeta().getVersion()));
     }
 }

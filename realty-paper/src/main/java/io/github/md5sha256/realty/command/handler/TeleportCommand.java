@@ -4,6 +4,7 @@ import com.google.inject.Inject;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.protection.flags.Flags;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
+import io.github.md5sha256.realty.Realty;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.SafeLocationFinder;
@@ -50,12 +51,12 @@ public final class TeleportCommand implements CommandHandler {
     private final SafeLocationFinder safeLocationFinder;
 
     @Inject
-    public TeleportCommand(@NotNull Logger logger,
+    public TeleportCommand(@NotNull Realty plugin,
                            @NotNull RealtyPaperApi api,
                            @NotNull AtomicReference<Settings> settings,
                            @NotNull Message messages,
                            @NotNull SafeLocationFinder safeLocationFinder) {
-        this.logger = logger;
+        this.logger = plugin.getLogger();
         this.api = api;
         this.settings = settings;
         this.messages = messages;
