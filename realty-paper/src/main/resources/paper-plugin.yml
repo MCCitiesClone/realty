@@ -213,6 +213,57 @@ permissions:
   realty.command.module.reload:
     description: Allows using /realty module reload
     default: op
+  realty.command.modify.price:
+    description: Allows using /realty modify price
+    default: true
+  realty.command.modify.duration:
+    description: Allows using /realty modify duration
+    default: true
+  realty.command.modify.maxextensions:
+    description: Allows using /realty modify maxextensions
+    default: true
+  realty.command.modify.accept:
+    description: Allows using /realty modify accept
+    default: true
+  realty.command.modify.reject:
+    description: Allows using /realty modify reject
+    default: true
+  realty.command.modify.withdraw:
+    description: Allows using /realty modify withdraw
+    default: true
+  realty.command.modify.inbox:
+    description: Allows using /realty modify inbox
+    default: true
+  realty.command.modify.outbox:
+    description: Allows using /realty modify outbox
+    default: true
+  realty.command.modify.others:
+    description: Allows modifying a leasehold you are not a party to
+    default: op
+  realty.command.rentable:
+    description: Allows using /realty rentable
+    default: true
+  realty.command.rentable.others:
+    description: Allows using /realty rentable on a leasehold you are not the landlord of
+    default: op
+  realty.command.terminate:
+    description: Allows using /realty terminate
+    default: true
+  realty.command.terminate.others:
+    description: Allows terminating a leasehold you are not a party to
+    default: op
+  realty.command.terminate.now:
+    description: Allows skipping the termination notice period with --now
+    default: op
+  realty.command.set.price.leasehold:
+    description: Allows setting a leasehold price instantly instead of via /realty modify
+    default: op
+  realty.command.set.duration.leasehold:
+    description: Allows setting a leasehold duration instantly instead of via /realty modify
+    default: op
+  realty.command.set.maxextensions.leasehold:
+    description: Allows setting leasehold max extensions instantly instead of via /realty modify
+    default: op
   realty.command.government.register:
     description: Allows using /realty government register
     default: op

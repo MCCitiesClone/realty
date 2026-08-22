@@ -13,15 +13,18 @@ import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
 import io.github.md5sha256.realty.api.event.RegionBoughtEvent;
 import io.github.md5sha256.realty.api.event.RegionRentedEvent;
 import io.github.md5sha256.realty.api.event.RegionUnrentedEvent;
+import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.party.PartyNames;
 import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
@@ -59,89 +62,105 @@ public final class RegionNotificationListener implements Listener {
         return List.copyOf(parties.domainMembers(partyUuid));
     }
 
+    /**
+     * Fires a notification, unless it has nobody to reach.
+     *
+     * <p>A player party is always its own recipient, so an empty list only happens for a government
+     * whose membership could not be read — Treasury unreachable, an account with no members, or a
+     * Vault-only server. {@link RealtyNotificationEvent} rejects an empty target list, so firing
+     * anyway would throw out of the domain event that triggered this.
+     */
+    private void notify(@NotNull List<UUID> targets, @NotNull Component message,
+                        @Nullable WorldGuardRegion region) {
+        if (targets.isEmpty()) {
+            return;
+        }
+        this.events.fireSync(new RealtyNotificationEvent(targets, message, region));
+    }
+
     @EventHandler
     public void onRegionBought(@NotNull RegionBoughtEvent event) {
         UUID seller = event.getPreviousTitleHolderId();
         if (seller == null) {
             return;
         }
-        this.events.fireSync(new RealtyNotificationEvent(recipients(seller),
+        notify(recipients(seller),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_REGION_BOUGHT,
                         Placeholder.unparsed("player", resolveName(event.getBuyerId())),
                         Placeholder.unparsed("price", CurrencyFormatter.format(event.getPrice())),
                         Placeholder.unparsed("region", event.getRegionId())),
-                event.getRegion()));
+                event.getRegion());
     }
 
     @EventHandler
     public void onRegionRented(@NotNull RegionRentedEvent event) {
-        this.events.fireSync(new RealtyNotificationEvent(recipients(event.getLandlordId()),
+        notify(recipients(event.getLandlordId()),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_REGION_RENTED,
                         Placeholder.unparsed("player", resolveName(event.getTenantId())),
                         Placeholder.unparsed("price", CurrencyFormatter.format(event.getPrice())),
                         Placeholder.unparsed("region", event.getRegionId())),
-                event.getRegion()));
+                event.getRegion());
     }
 
     @EventHandler
     public void onRegionUnrented(@NotNull RegionUnrentedEvent event) {
-        this.events.fireSync(new RealtyNotificationEvent(recipients(event.getLandlordId()),
+        notify(recipients(event.getLandlordId()),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_REGION_UNRENTED,
                         Placeholder.unparsed("player", resolveName(event.getTenantId())),
                         Placeholder.unparsed("region", event.getRegionId()),
                         Placeholder.unparsed("refund", CurrencyFormatter.format(event.getRefund()))),
-                event.getRegion()));
+                event.getRegion());
     }
 
     @EventHandler
     public void onLeaseExpired(@NotNull LeaseExpiredEvent event) {
-        this.events.fireSync(new RealtyNotificationEvent(recipients(event.getTenantId()),
+        notify(recipients(event.getTenantId()),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_LEASEHOLD_EXPIRED,
                         Placeholder.unparsed("region", event.getRegionId())),
-                event.getRegion()));
-        this.events.fireSync(new RealtyNotificationEvent(recipients(event.getLandlordId()),
+                event.getRegion());
+        notify(recipients(event.getLandlordId()),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_LEASEHOLD_EXPIRED_LANDLORD,
                         Placeholder.unparsed("region", event.getRegionId())),
-                event.getRegion()));
+                event.getRegion());
     }
 
     @EventHandler
     public void onModificationProposed(@NotNull LeaseModificationProposedEvent event) {
         if (LeaseholdRoles.LANDLORD.equals(event.getProposerRole())) {
             // Landlord proposed: notify the tenant, who decides by renewing or not.
-            this.events.fireSync(new RealtyNotificationEvent(recipients(event.getTenantId()),
+            notify(recipients(event.getTenantId()),
                     this.messages.messageFor(MessageKeys.NOTIFICATION_MODIFY_PROPOSED_LANDLORD,
                             Placeholder.unparsed("region", event.getRegionId())),
-                    event.getRegion()));
+                    event.getRegion());
         } else {
             // Tenant proposed: notify the landlord, who must accept or reject.
-            this.events.fireSync(new RealtyNotificationEvent(recipients(event.getLandlordId()),
+            notify(recipients(event.getLandlordId()),
                     this.messages.messageFor(MessageKeys.NOTIFICATION_MODIFY_PROPOSED_TENANT,
                             Placeholder.unparsed("player", resolveName(event.getProposerId())),
                             Placeholder.unparsed("region", event.getRegionId())),
-                    event.getRegion()));
+                    event.getRegion());
         }
     }
 
     @EventHandler
     public void onModificationResolved(@NotNull LeaseModificationResolvedEvent event) {
         switch (event.getResolution()) {
-            case "ACCEPTED" -> this.events.fireSync(new RealtyNotificationEvent(recipients(event.getTenantId()),
+            case "ACCEPTED" -> notify(recipients(event.getTenantId()),
                     this.messages.messageFor(MessageKeys.NOTIFICATION_MODIFY_ACCEPTED,
                             Placeholder.unparsed("region", event.getRegionId())),
-                    event.getRegion()));
-            case "REJECTED" -> this.events.fireSync(new RealtyNotificationEvent(recipients(event.getTenantId()),
+                    event.getRegion());
+            case "REJECTED" -> notify(recipients(event.getTenantId()),
                     this.messages.messageFor(MessageKeys.NOTIFICATION_MODIFY_REJECTED,
                             Placeholder.unparsed("region", event.getRegionId())),
-                    event.getRegion()));
+                    event.getRegion());
             case "WITHDRAWN" -> {
                 // Notify the party that did not withdraw.
                 UUID target = LeaseholdRoles.LANDLORD.equals(event.getProposerRole())
                         ? event.getTenantId() : event.getLandlordId();
-                this.events.fireSync(new RealtyNotificationEvent(recipients(target),
+                notify(recipients(target),
                         this.messages.messageFor(MessageKeys.NOTIFICATION_MODIFY_WITHDRAWN,
                                 Placeholder.unparsed("region", event.getRegionId())),
-                        event.getRegion()));
+                        event.getRegion());
             }
             default -> { }
         }
@@ -151,17 +170,17 @@ public final class RegionNotificationListener implements Listener {
     public void onTerminationScheduled(@NotNull LeaseTerminationScheduledEvent event) {
         String date = event.getEffectiveDate().format(DateTimeFormatters.DATE_TIME);
         if (LeaseholdRoles.LANDLORD.equals(event.getTerminatedByRole())) {
-            this.events.fireSync(new RealtyNotificationEvent(recipients(event.getTenantId()),
+            notify(recipients(event.getTenantId()),
                     this.messages.messageFor(MessageKeys.NOTIFICATION_TERMINATION_SCHEDULED_TENANT,
                             Placeholder.unparsed("region", event.getRegionId()),
                             Placeholder.unparsed("date", date)),
-                    event.getRegion()));
+                    event.getRegion());
         } else {
-            this.events.fireSync(new RealtyNotificationEvent(recipients(event.getLandlordId()),
+            notify(recipients(event.getLandlordId()),
                     this.messages.messageFor(MessageKeys.NOTIFICATION_TERMINATION_SCHEDULED_LANDLORD,
                             Placeholder.unparsed("region", event.getRegionId()),
                             Placeholder.unparsed("date", date)),
-                    event.getRegion()));
+                    event.getRegion());
         }
     }
 
@@ -170,23 +189,23 @@ public final class RegionNotificationListener implements Listener {
         // Notify the party that did not initiate the (now-cancelled) termination.
         UUID target = LeaseholdRoles.LANDLORD.equals(event.getTerminatedByRole())
                 ? event.getTenantId() : event.getLandlordId();
-        this.events.fireSync(new RealtyNotificationEvent(recipients(target),
+        notify(recipients(target),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_TERMINATION_CANCELLED,
                         Placeholder.unparsed("region", event.getRegionId())),
-                event.getRegion()));
+                event.getRegion());
     }
 
     @EventHandler
     public void onLeaseTerminated(@NotNull LeaseTerminatedEvent event) {
-        this.events.fireSync(new RealtyNotificationEvent(recipients(event.getTenantId()),
+        notify(recipients(event.getTenantId()),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_LEASEHOLD_TERMINATED_TENANT,
                         Placeholder.unparsed("region", event.getRegionId()),
                         Placeholder.unparsed("refund", CurrencyFormatter.format(event.getRefund()))),
-                event.getRegion()));
-        this.events.fireSync(new RealtyNotificationEvent(recipients(event.getLandlordId()),
+                event.getRegion());
+        notify(recipients(event.getLandlordId()),
                 this.messages.messageFor(MessageKeys.NOTIFICATION_LEASEHOLD_TERMINATED_LANDLORD,
                         Placeholder.unparsed("region", event.getRegionId())),
-                event.getRegion()));
+                event.getRegion());
     }
 
     /**
