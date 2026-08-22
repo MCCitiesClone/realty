@@ -15,6 +15,7 @@ import io.github.md5sha256.realty.database.mapper.FreeholdContractBidPaymentMapp
 import io.github.md5sha256.realty.database.mapper.AgentHistoryMapper;
 import io.github.md5sha256.realty.database.mapper.FreeholdContractAgentInviteMapper;
 import io.github.md5sha256.realty.database.mapper.FreeholdContractSanctionedAuctioneerMapper;
+import io.github.md5sha256.realty.database.mapper.GovernmentPartyMapper;
 import io.github.md5sha256.realty.database.mapper.RealtySignMapper;
 import io.github.md5sha256.realty.database.mapper.RegionTagMapper;
 import io.github.md5sha256.realty.database.mapper.SearchMapper;
@@ -60,6 +61,8 @@ public interface SqlSessionWrapper extends Closeable {
     @NotNull RealtySignMapper realtySignMapper();
 
     @NotNull RegionTagMapper regionTagMapper();
+
+    @NotNull GovernmentPartyMapper governmentPartyMapper();
 
     @NotNull SearchMapper searchMapper();
 

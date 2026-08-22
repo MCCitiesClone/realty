@@ -81,6 +81,7 @@ abstract class AbstractDatabaseTest {
                     TRUNCATE TABLE FreeholdContract;
                     TRUNCATE TABLE Contract;
                     TRUNCATE TABLE RealtyRegion;
+                    TRUNCATE TABLE RealtyGovernmentParty;
                     SET FOREIGN_KEY_CHECKS = 1;
                     """);
         }

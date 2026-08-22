@@ -19,13 +19,14 @@ import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.database.entity.FreeholdContractAuctionEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractBid;
+import io.github.md5sha256.realty.party.PartyNames;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -54,7 +55,8 @@ public record AuctionCommandGroup(
         @NotNull RealtyPaperApi api,
         @NotNull AtomicReference<Settings> settings,
         @NotNull MessageContainer messages,
-        @NotNull RealtyEventDispatch events
+        @NotNull RealtyEventDispatch events,
+        @NotNull PartyService parties
 ) implements CustomCommandBean {
 
     @Override
@@ -148,9 +150,8 @@ public record AuctionCommandGroup(
         });
     }
 
-    private static @NotNull String resolveName(@NotNull UUID uuid) {
-        String name = Bukkit.getOfflinePlayer(uuid).getName();
-        return name != null ? name : uuid.toString();
+    private @NotNull String resolveName(@NotNull UUID uuid) {
+        return PartyNames.resolve(parties, uuid);
     }
 
     // ── /realty auction <bidDuration> <paymentDuration> <minBid> <minBidStep> <region> ──

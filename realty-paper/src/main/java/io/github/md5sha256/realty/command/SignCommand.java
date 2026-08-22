@@ -11,6 +11,7 @@ import io.github.md5sha256.realty.api.SignTextApplicator;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.entity.RealtySignEntity;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.api.ExecutorState;
@@ -38,7 +39,8 @@ import java.util.UUID;
  */
 public record SignCommand(@NotNull RealtyPaperApi api,
                            @NotNull ExecutorState executorState,
-                           @NotNull MessageContainer messages) implements CustomCommandBean {
+                           @NotNull MessageContainer messages,
+                           @NotNull PartyService parties) implements CustomCommandBean {
 
     @Override
     public @NotNull List<Command<? extends Source>> commands(@NotNull Command.Builder<Source> builder) {
@@ -101,7 +103,7 @@ public record SignCommand(@NotNull RealtyPaperApi api,
         UUID worldId = region.world().getUID();
         api.getLeaseholdContract(regionId, worldId)
                 .thenAccept(lease -> {
-                    if (lease == null || !player.getUniqueId().equals(lease.landlordId())) {
+                    if (lease == null || !parties.actsFor(player.getUniqueId(), lease.landlordId())) {
                         player.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_NOT_LANDLORD,
                                 Placeholder.unparsed("region", regionId)));
                         return;

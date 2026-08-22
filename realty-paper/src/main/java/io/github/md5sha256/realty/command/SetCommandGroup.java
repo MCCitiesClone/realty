@@ -5,6 +5,7 @@ import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.RealtyBackend;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.command.util.AuthorityParser;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.command.util.DurationParser;
 import io.github.md5sha256.realty.command.util.ParseBounds;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
@@ -16,11 +17,10 @@ import io.github.md5sha256.realty.api.event.TitleTransferEvent;
 import io.github.md5sha256.realty.api.event.TitleTransferredEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
+import io.github.md5sha256.realty.party.PartyNames;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -51,13 +51,12 @@ import java.util.UUID;
 public record SetCommandGroup(
         @NotNull RealtyPaperApi api,
         @NotNull MessageContainer messages,
-        @NotNull RealtyEventDispatch events
+        @NotNull RealtyEventDispatch events,
+        @NotNull PartyService parties
 ) implements CustomCommandBean {
 
-    private static @NotNull String resolveName(@NotNull UUID uuid) {
-        OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-        String name = player.getName();
-        return name != null ? name : uuid.toString();
+    private @NotNull String resolveName(@NotNull UUID uuid) {
+        return PartyNames.resolve(parties, uuid);
     }
 
     /**
@@ -96,7 +95,7 @@ public record SetCommandGroup(
                 } else if (lease.tenantId() != null) {
                     player.sendMessage(messages.messageFor(MessageKeys.SET_OCCUPIED_USE_MODIFY,
                             Placeholder.unparsed("region", regionId)));
-                } else if (!player.getUniqueId().equals(lease.landlordId())) {
+                } else if (!parties.actsFor(player.getUniqueId(), lease.landlordId())) {
                     player.sendMessage(messages.messageFor(MessageKeys.SET_NOT_LANDLORD,
                             Placeholder.unparsed("region", regionId)));
                 } else {
@@ -118,7 +117,7 @@ public record SetCommandGroup(
                 .literal("set");
         var titleholderCommand = base.literal("titleholder")
                 .permission("realty.command.set.titleholder")
-                .required("titleholder", AuthorityParser.authority())
+                .required("titleholder", AuthorityParser.party(parties))
                 .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                 .handler(this::executeSetTitleHolder)
                 .build();
@@ -138,14 +137,14 @@ public record SetCommandGroup(
                         .build(),
                 base.literal("landlord")
                         .permission("realty.command.set.landlord")
-                        .required("landlord", AuthorityParser.authority())
+                        .required("landlord", AuthorityParser.party(parties))
                         .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                         .handler(this::executeSetLandlord)
                         .build(),
                 titleholderCommand,
                 base.literal("tenant")
                         .permission("realty.command.set.tenant")
-                        .required("tenant", AuthorityParser.authority())
+                        .required("tenant", AuthorityParser.party(parties))
                         .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                         .handler(this::executeSetTenant)
                         .build(),
@@ -157,7 +156,7 @@ public record SetCommandGroup(
                         .build(),
                 base.literal("authority")
                         .permission("realty.command.set.authority")
-                        .required("authority", AuthorityParser.authority())
+                        .required("authority", AuthorityParser.party(parties))
                         .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                         .handler(this::executeSetAuthority)
                         .build()

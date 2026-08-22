@@ -549,4 +549,15 @@ public final class MessageKeys {
     public static final String TAG_CLEAR_SUCCESS = "tag.clear-success";
     public static final String TAG_CLEAR_NONE = "tag.clear-none";
     public static final String TAG_ERROR = "tag.error";
+
+    // government
+    public static final String GOVERNMENT_REGISTERED = "government.registered";
+    public static final String GOVERNMENT_UNREGISTERED = "government.unregistered";
+    public static final String GOVERNMENT_NOT_FOUND = "government.not-found";
+    public static final String GOVERNMENT_NOT_REGISTERED = "government.not-registered";
+    public static final String GOVERNMENT_NO_TREASURY = "government.no-treasury";
+    public static final String GOVERNMENT_LIST_HEADER = "government.list-header";
+    public static final String GOVERNMENT_LIST_ENTRY = "government.list-entry";
+    public static final String GOVERNMENT_LIST_EMPTY = "government.list-empty";
+    public static final String GOVERNMENT_ERROR = "government.error";
 }

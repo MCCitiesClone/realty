@@ -4,6 +4,7 @@ import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.command.util.NamedAuthority;
 import io.github.md5sha256.realty.command.util.NamedAuthorityParser;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
 import io.github.md5sha256.realty.database.entity.RealtyRegionEntity;
 import io.github.md5sha256.realty.localisation.MessageContainer;
@@ -32,15 +33,22 @@ import java.util.UUID;
  */
 public record ListCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages
+        @NotNull MessageContainer messages,
+        @NotNull PartyService parties
 ) implements CustomCommandBean {
 
     private static final int PAGE_SIZE = 10;
 
-    private static final CommandFlag<NamedAuthority> PLAYER_FLAG =
-            CommandFlag.<Source>builder("player")
-                    .withComponent(NamedAuthorityParser.namedAuthority())
-                    .build();
+    // Built per registration rather than held as a constant: the parser resolves gov:<Name>
+    // through the party service, which a static initialiser cannot reach. Flag values are read
+    // back by name, so the declaring instance need not be the same object.
+    private static final String PLAYER_FLAG = "player";
+
+    private @NotNull CommandFlag<NamedAuthority> playerFlag() {
+        return CommandFlag.<Source>builder(PLAYER_FLAG)
+                .withComponent(NamedAuthorityParser.party(parties))
+                .build();
+    }
 
     private static final CommandFlag<Integer> PAGE_FLAG =
             CommandFlag.<Source>builder("page")
@@ -52,7 +60,7 @@ public record ListCommand(
         var base = builder
                 .literal("list")
                 .permission("realty.command.list")
-                .flag(PLAYER_FLAG)
+                .flag(playerFlag())
                 .flag(PAGE_FLAG);
         var meProxy = builder.literal("me")
                 .senderType(PlayerSource.class)
@@ -61,7 +69,7 @@ public record ListCommand(
                 .handler(ctx -> {
                     var player = ctx.sender().source();
                     ctx.flags()
-                            .addValueFlag(PLAYER_FLAG,
+                            .addValueFlag(playerFlag(),
                                     new NamedAuthority(player.getUniqueId(), player.getName()));
                     execute(ctx, null);
                 })

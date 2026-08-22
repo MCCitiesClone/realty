@@ -3,6 +3,7 @@ package io.github.md5sha256.realty.api;
 import io.github.md5sha256.realty.database.entity.FreeholdContractAuctionEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractBid;
 import io.github.md5sha256.realty.database.entity.FreeholdContractEntity;
+import io.github.md5sha256.realty.database.entity.GovernmentPartyEntity;
 import io.github.md5sha256.realty.database.entity.HistoryEntry;
 import io.github.md5sha256.realty.database.entity.InboundOfferView;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
@@ -462,6 +463,57 @@ public interface RealtyBackend {
 
     @Nullable RegionWithState getRegionWithState(@NotNull String worldGuardRegionId,
                                                  @NotNull UUID worldId);
+
+    // --- Government Parties ---
+
+    /**
+     * Registers a Treasury {@code GOVERNMENT} account as a party that may hold a region's
+     * authority, title, landlordship or tenancy, or refreshes the cached display name if it is
+     * already registered.
+     *
+     * <p>Idempotent: the returned party UUID is derived from {@code accountId}, so registering the
+     * same account twice yields the same party rather than a second one.
+     *
+     * @param accountId   the Treasury account id
+     * @param displayName the account's display name, cached for rendering
+     * @return the registered party
+     */
+    @NotNull GovernmentPartyEntity registerGovernmentParty(int accountId, @NotNull String displayName);
+
+    /**
+     * Resolves a party UUID to the government it stands for.
+     *
+     * <p>This is the question every edge of the system asks before treating a party as a player:
+     * {@code null} means the UUID is an ordinary player UUID.
+     *
+     * @param partyUuid the UUID held by a contract row
+     * @return the government party, or {@code null} if this UUID does not name one
+     */
+    @Nullable GovernmentPartyEntity getGovernmentParty(@NotNull UUID partyUuid);
+
+    /**
+     * Resolves a Treasury account id to its registered party.
+     *
+     * @param accountId the Treasury account id
+     * @return the government party, or {@code null} if the account has never been registered
+     */
+    @Nullable GovernmentPartyEntity getGovernmentPartyByAccountId(int accountId);
+
+    /**
+     * Returns every registered government party, ordered by display name.
+     *
+     * @return all registered government parties
+     */
+    @NotNull List<GovernmentPartyEntity> getGovernmentParties();
+
+    /**
+     * Unregisters a government party. Contract rows still holding the UUID keep it, so only
+     * unregister a party that holds nothing.
+     *
+     * @param partyUuid the party UUID to unregister
+     * @return number of rows deleted (1 on success, 0 if it was not registered)
+     */
+    int deleteGovernmentParty(@NotNull UUID partyUuid);
 
     // --- Authority Check ---
 

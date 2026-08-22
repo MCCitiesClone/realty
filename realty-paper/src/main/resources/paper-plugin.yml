@@ -213,6 +213,15 @@ permissions:
   realty.command.module.reload:
     description: Allows using /realty module reload
     default: op
+  realty.command.government.register:
+    description: Allows using /realty government register
+    default: op
+  realty.command.government.unregister:
+    description: Allows using /realty government unregister
+    default: op
+  realty.command.government.list:
+    description: Allows using /realty government list
+    default: op
   realty.command.cleanup.tags:
     description: Allows using /realty cleanup tags
     default: op
