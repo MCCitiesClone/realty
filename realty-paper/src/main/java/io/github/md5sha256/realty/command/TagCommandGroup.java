@@ -6,13 +6,12 @@ import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.SqlSessionWrapper;
 import io.github.md5sha256.realty.database.mapper.RegionTagMapper;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.RealtyTags;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -31,7 +30,7 @@ public record TagCommandGroup(
         @NotNull Database database,
         @NotNull ExecutorState executorState,
         @NotNull AtomicReference<RealtyTags> realtyTags,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     @Override
@@ -83,17 +82,17 @@ public record TagCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         ConfigRegionTag configTag = realtyTags.get().get(tagId);
         if (configTag == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.TAG_UNKNOWN,
-                    Placeholder.unparsed("tag", tagId)));
+            sender.sendMessage(messages.component(MessageKeys.TAG_UNKNOWN,
+                    "tag", tagId));
             return;
         }
         if (configTag.permission() != null && !sender.hasPermission(configTag.permission().node())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_NO_PERMISSION));
             return;
         }
         String regionId = region.region().getId();
@@ -101,24 +100,24 @@ public record TagCommandGroup(
             try (SqlSessionWrapper session = database.openSession(true)) {
                 RegionTagMapper mapper = session.regionTagMapper();
                 if (mapper.exists(tagId, regionId)) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_ADD_ALREADY_TAGGED,
-                            Placeholder.unparsed("tag", tagId),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_ADD_ALREADY_TAGGED,
+                            "tag", tagId,
+                            "region", regionId));
                     return;
                 }
                 int inserted = mapper.insert(tagId, regionId);
                 if (inserted > 0) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_ADD_SUCCESS,
-                            Placeholder.unparsed("tag", tagId),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_ADD_SUCCESS,
+                            "tag", tagId,
+                            "region", regionId));
                 } else {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_ADD_FAILED,
-                            Placeholder.unparsed("tag", tagId),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_ADD_FAILED,
+                            "tag", tagId,
+                            "region", regionId));
                 }
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.TAG_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.TAG_ERROR,
+                        "error", ex.getMessage()));
             }
         }, executorState.dbExec());
     }
@@ -130,17 +129,17 @@ public record TagCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         ConfigRegionTag configTag = realtyTags.get().get(tagId);
         if (configTag == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.TAG_UNKNOWN,
-                    Placeholder.unparsed("tag", tagId)));
+            sender.sendMessage(messages.component(MessageKeys.TAG_UNKNOWN,
+                    "tag", tagId));
             return;
         }
         if (configTag.permission() != null && !sender.hasPermission(configTag.permission().node())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_NO_PERMISSION));
             return;
         }
         String regionId = region.region().getId();
@@ -149,17 +148,17 @@ public record TagCommandGroup(
                 RegionTagMapper mapper = session.regionTagMapper();
                 int deleted = mapper.deleteByTagAndRegion(tagId, regionId);
                 if (deleted > 0) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_REMOVE_SUCCESS,
-                            Placeholder.unparsed("tag", tagId),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_REMOVE_SUCCESS,
+                            "tag", tagId,
+                            "region", regionId));
                 } else {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_REMOVE_NOT_FOUND,
-                            Placeholder.unparsed("tag", tagId),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_REMOVE_NOT_FOUND,
+                            "tag", tagId,
+                            "region", regionId));
                 }
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.TAG_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.TAG_ERROR,
+                        "error", ex.getMessage()));
             }
         }, executorState.dbExec());
     }
@@ -170,7 +169,7 @@ public record TagCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -178,16 +177,16 @@ public record TagCommandGroup(
             try (SqlSessionWrapper session = database.openSession(true)) {
                 int deleted = session.regionTagMapper().deleteByRegionId(regionId);
                 if (deleted > 0) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_CLEAR_SUCCESS,
-                            Placeholder.unparsed("count", String.valueOf(deleted)),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_CLEAR_SUCCESS,
+                            "count", String.valueOf(deleted),
+                            "region", regionId));
                 } else {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TAG_CLEAR_NONE,
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.TAG_CLEAR_NONE,
+                            "region", regionId));
                 }
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.TAG_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.TAG_ERROR,
+                        "error", ex.getMessage()));
             }
         }, executorState.dbExec());
     }
@@ -198,16 +197,16 @@ public record TagCommandGroup(
                 .filter(tag -> tag.permission() == null || sender.hasPermission(tag.permission().node()))
                 .toList();
         if (permitted.isEmpty()) {
-            sender.sendMessage(messages.messageFor(MessageKeys.TAG_LIST_NONE));
+            sender.sendMessage(messages.component(MessageKeys.TAG_LIST_NONE));
             return;
         }
         TextComponent.Builder builder = Component.text();
-        builder.append(messages.messageFor(MessageKeys.TAG_LIST_HEADER));
+        builder.append(messages.component(MessageKeys.TAG_LIST_HEADER));
         for (ConfigRegionTag tag : permitted) {
             builder.appendNewline();
-            builder.append(messages.messageFor(MessageKeys.TAG_LIST_ENTRY,
-                    Placeholder.unparsed("tag", tag.tagId()),
-                    Placeholder.component("display", tag.tagDisplayName())));
+            builder.append(messages.component(MessageKeys.TAG_LIST_ENTRY,
+                    "tag", tag.tagId(),
+                    "display", tag.tagDisplayName()));
         }
         sender.sendMessage(builder.build());
     }

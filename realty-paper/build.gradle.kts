@@ -36,7 +36,6 @@ dependencies {
         exclude(group = "com.google.errorprone", module = "error_prone_annotations")
         exclude(group = "com.google.guava", module = "listenablefuture")
     }
-    implementation("org.spongepowered:configurate-yaml:4.2.0")
     // Shared module system, schema migrations and formatting helpers. Deliberately NOT relocated in
     // shadowJar: module jars are compiled against these types and loaded into this plugin's class
     // loader, so the names must match.
@@ -67,13 +66,13 @@ tasks {
         val base = "io.github.md5sha256.realty.libraries"
         relocate("org.mariadb", "${base}.org.mariadb")
         relocate("org.mybatis", "${base}.org.mybatis")
-        relocate("org.spongepowered", "${base}.org.spongepowered")
         relocate("org.yaml", "${base}.org.yaml")
-        relocate("io.leangen.geantyref", "${base}.io.leangen.geantyref")
         relocate("org.apache.ibatis", "${base}.org.apache.ibatis")
         relocate("org.jetbrains.annotations", "${base}.org.jetbrains.annotations")
         relocate("org.intellij.lang", "${base}.org.intellij.lang")
         relocate("net.kyori.option", "${base}.net.kyori.option")
+        // Still bundled by Cloud, not by Configurate; goes when Cloud does.
+        relocate("io.leangen.geantyref", "${base}.io.leangen.geantyref")
         relocate("org.incendo.cloud", "${base}.org.incendo.cloud")
         relocate("org.enginehub.squirrelid", "${base}.org.enginehub.squirrelid")
         relocate("org.sqlite", "${base}.org.sqlite")
@@ -135,4 +134,12 @@ tasks {
             url("https://mediafilez.forgecdn.net/files/3007/470/Vault.jar")
         }
     }
+}
+
+// Transitional: lets the one-off messages.yml -> messages.properties conversion run against the
+// real classpath. Removed once messages.yml is gone.
+tasks.register("printRuntimeCp") {
+    // paper-api is compileOnly, so the runtime classpath alone cannot load YamlConfiguration.
+    val cp = sourceSets["main"].compileClasspath + sourceSets["main"].output
+    doLast { println(cp.asPath) }
 }

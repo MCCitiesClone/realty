@@ -18,9 +18,8 @@ import io.github.md5sha256.realty.api.event.TitleTransferredEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.party.PartyNames;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -50,7 +49,7 @@ import java.util.UUID;
  */
 public record SetCommandGroup(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events,
         @NotNull PartyService parties
 ) implements CustomCommandBean {
@@ -90,14 +89,14 @@ public record SetCommandGroup(
                 // Some instant term changes on a leasehold require an extra node; without it the
                 // change must go through /realty modify so it applies on the next cycle.
                 if (leaseholdPerm != null && !player.hasPermission(leaseholdPerm)) {
-                    player.sendMessage(messages.messageFor(MessageKeys.SET_LEASEHOLD_NO_PERMISSION,
-                            Placeholder.unparsed("region", regionId)));
+                    player.sendMessage(messages.component(MessageKeys.SET_LEASEHOLD_NO_PERMISSION,
+                            "region", regionId));
                 } else if (lease.tenantId() != null) {
-                    player.sendMessage(messages.messageFor(MessageKeys.SET_OCCUPIED_USE_MODIFY,
-                            Placeholder.unparsed("region", regionId)));
+                    player.sendMessage(messages.component(MessageKeys.SET_OCCUPIED_USE_MODIFY,
+                            "region", regionId));
                 } else if (!parties.actsFor(player.getUniqueId(), lease.landlordId())) {
-                    player.sendMessage(messages.messageFor(MessageKeys.SET_NOT_LANDLORD,
-                            Placeholder.unparsed("region", regionId)));
+                    player.sendMessage(messages.component(MessageKeys.SET_NOT_LANDLORD,
+                            "region", regionId));
                 } else {
                     onAuthorized.run();
                 }
@@ -106,7 +105,7 @@ public record SetCommandGroup(
             if (isWorldGuardOwner) {
                 onAuthorized.run();
             } else {
-                player.sendMessage(messages.messageFor(MessageKeys.SET_NO_PERMISSION));
+                player.sendMessage(messages.component(MessageKeys.SET_NO_PERMISSION));
             }
         });
     }
@@ -170,14 +169,14 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         UUID worldId = region.world().getUID();
         if (sender instanceof Player player
                 && !events.fireSync(new PriceSetEvent(region, player.getUniqueId(), price))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         authorizeLeaseholdSet(sender, region, "realty.command.set.price.others",
@@ -185,26 +184,26 @@ public record SetCommandGroup(
         api.setPrice(regionId, worldId, price).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.SetPriceResult.Success ignored -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_PRICE_SUCCESS,
-                                Placeholder.unparsed("price", CurrencyFormatter.format(price)),
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_PRICE_SUCCESS,
+                                "price", CurrencyFormatter.format(price),
+                                "region", regionId));
                         events.fireSync(new PriceChangedEvent(region, price));
                 }
                 case RealtyBackend.SetPriceResult.NoContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_PRICE_NO_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_PRICE_NO_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.SetPriceResult.AuctionExists ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_PRICE_AUCTION_EXISTS,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_PRICE_AUCTION_EXISTS,
+                                "region", regionId));
                 case RealtyBackend.SetPriceResult.OfferPaymentInProgress ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_PRICE_OFFER_PAYMENT_IN_PROGRESS,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_PRICE_OFFER_PAYMENT_IN_PROGRESS,
+                                "region", regionId));
                 case RealtyBackend.SetPriceResult.BidPaymentInProgress ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_PRICE_BID_PAYMENT_IN_PROGRESS,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_PRICE_BID_PAYMENT_IN_PROGRESS,
+                                "region", regionId));
                 case RealtyBackend.SetPriceResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_PRICE_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_PRICE_UPDATE_FAILED,
+                                "region", regionId));
             }
         }));
     }
@@ -216,7 +215,7 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -226,15 +225,15 @@ public record SetCommandGroup(
         api.setDuration(regionId, worldId, duration.toSeconds()).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.SetDurationResult.Success ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_DURATION_SUCCESS,
-                                Placeholder.unparsed("duration", DurationFormatter.format(duration)),
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_DURATION_SUCCESS,
+                                "duration", DurationFormatter.format(duration),
+                                "region", regionId));
                 case RealtyBackend.SetDurationResult.NoLeaseholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_DURATION_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_DURATION_NO_LEASEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.SetDurationResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_DURATION_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_DURATION_UPDATE_FAILED,
+                                "region", regionId));
             }
         }));
     }
@@ -246,27 +245,27 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         authorizeLeaseholdSet(sender, region, "realty.command.set.landlord.others", null, () ->
         api.setLandlord(region, landlordId).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.SetLandlordResult.Success success -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_LANDLORD_SUCCESS,
-                                Placeholder.unparsed("landlord", resolveName(landlordId)),
-                                Placeholder.unparsed("region", success.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_LANDLORD_SUCCESS,
+                                "landlord", resolveName(landlordId),
+                                "region", success.regionId()));
                         events.fireSync(new LandlordSetEvent(region, landlordId, success.previousLandlord()));
                 }
                 case RealtyPaperApi.SetLandlordResult.NoLeaseholdContract noContract ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_LANDLORD_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", noContract.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_LANDLORD_NO_LEASEHOLD_CONTRACT,
+                                "region", noContract.regionId()));
                 case RealtyPaperApi.SetLandlordResult.UpdateFailed updateFailed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_LANDLORD_UPDATE_FAILED,
-                                Placeholder.unparsed("region", updateFailed.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_LANDLORD_UPDATE_FAILED,
+                                "region", updateFailed.regionId()));
                 case RealtyPaperApi.SetLandlordResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_LANDLORD_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_LANDLORD_ERROR,
+                                "error", error.message()));
             }
         }));
     }
@@ -278,37 +277,37 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         if (sender instanceof Player player
                 && !sender.hasPermission("realty.command.set.titleholder.others")
                 && !region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.SET_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.SET_NO_PERMISSION));
             return;
         }
         if (!events.fireSync(new TitleTransferEvent(region, titleHolderId))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.setTitleHolder(region, titleHolderId).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.SetTitleHolderResult.Success success -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TITLEHOLDER_SUCCESS,
-                                Placeholder.unparsed("titleholder", resolveName(titleHolderId)),
-                                Placeholder.unparsed("region", success.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TITLEHOLDER_SUCCESS,
+                                "titleholder", resolveName(titleHolderId),
+                                "region", success.regionId()));
                         events.fireSync(new TitleTransferredEvent(region, titleHolderId,
                                 success.previousTitleHolder()));
                 }
                 case RealtyPaperApi.SetTitleHolderResult.NoFreeholdContract noContract ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TITLEHOLDER_NO_FREEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", noContract.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TITLEHOLDER_NO_FREEHOLD_CONTRACT,
+                                "region", noContract.regionId()));
                 case RealtyPaperApi.SetTitleHolderResult.UpdateFailed updateFailed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TITLEHOLDER_UPDATE_FAILED,
-                                Placeholder.unparsed("region", updateFailed.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TITLEHOLDER_UPDATE_FAILED,
+                                "region", updateFailed.regionId()));
                 case RealtyPaperApi.SetTitleHolderResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TITLEHOLDER_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TITLEHOLDER_ERROR,
+                                "error", error.message()));
             }
         });
     }
@@ -320,28 +319,28 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         authorizeLeaseholdSet(sender, region, "realty.command.set.tenant.others", null, () ->
         api.setTenant(region, tenantId).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.SetTenantResult.Success success -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TENANT_SUCCESS,
-                                Placeholder.unparsed("tenant", resolveName(tenantId)),
-                                Placeholder.unparsed("region", success.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TENANT_SUCCESS,
+                                "tenant", resolveName(tenantId),
+                                "region", success.regionId()));
                         events.fireSync(new TenantSetEvent(region, tenantId, success.previousTenant(),
                                 success.landlordId()));
                 }
                 case RealtyPaperApi.SetTenantResult.NoLeaseholdContract noContract ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TENANT_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", noContract.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TENANT_NO_LEASEHOLD_CONTRACT,
+                                "region", noContract.regionId()));
                 case RealtyPaperApi.SetTenantResult.UpdateFailed updateFailed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TENANT_UPDATE_FAILED,
-                                Placeholder.unparsed("region", updateFailed.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TENANT_UPDATE_FAILED,
+                                "region", updateFailed.regionId()));
                 case RealtyPaperApi.SetTenantResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_TENANT_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.SET_TENANT_ERROR,
+                                "error", error.message()));
             }
         }));
     }
@@ -353,7 +352,7 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -363,20 +362,19 @@ public record SetCommandGroup(
         api.setMaxRenewals(regionId, worldId, maxExtensions).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.SetMaxRenewalsResult.Success ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_MAX_EXTENSIONS_SUCCESS,
-                                Placeholder.unparsed("maxextensions",
-                                        maxExtensions < 0 ? "unlimited" : String.valueOf(maxExtensions)),
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_MAX_EXTENSIONS_SUCCESS,
+                                "maxextensions", maxExtensions < 0 ? "unlimited" : String.valueOf(maxExtensions),
+                                "region", regionId));
                 case RealtyBackend.SetMaxRenewalsResult.NoLeaseholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_MAX_EXTENSIONS_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_MAX_EXTENSIONS_NO_LEASEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.SetMaxRenewalsResult.BelowCurrentExtensions(int current) ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_MAX_EXTENSIONS_BELOW_CURRENT,
-                                Placeholder.unparsed("current", String.valueOf(current)),
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_MAX_EXTENSIONS_BELOW_CURRENT,
+                                "current", String.valueOf(current),
+                                "region", regionId));
                 case RealtyBackend.SetMaxRenewalsResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_MAX_EXTENSIONS_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_MAX_EXTENSIONS_UPDATE_FAILED,
+                                "region", regionId));
             }
         }));
     }
@@ -388,7 +386,7 @@ public record SetCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -396,21 +394,21 @@ public record SetCommandGroup(
         if (sender instanceof Player player
                 && !sender.hasPermission("realty.command.set.authority.others")
                 && !region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.SET_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.SET_NO_PERMISSION));
             return;
         }
         api.setAuthority(regionId, worldId, authorityId).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.SetAuthorityResult.Success ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_AUTHORITY_SUCCESS,
-                                Placeholder.unparsed("authority", resolveName(authorityId)),
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_AUTHORITY_SUCCESS,
+                                "authority", resolveName(authorityId),
+                                "region", regionId));
                 case RealtyBackend.SetAuthorityResult.NoFreeholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_AUTHORITY_NO_FREEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_AUTHORITY_NO_FREEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.SetAuthorityResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.SET_AUTHORITY_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SET_AUTHORITY_UPDATE_FAILED,
+                                "region", regionId));
             }
         });
     }

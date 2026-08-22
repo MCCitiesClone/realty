@@ -20,11 +20,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.logging.Logger;
 
 /**
@@ -60,7 +62,7 @@ class BundledResourceTest {
 
     /** Every resource the plugin reads at startup. */
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "settings", "database", "profiles", "region-tags", "taxes"})
+    @ValueSource(strings = {"settings", "database", "profiles", "region-tags", "taxes"})
     @DisplayName("every bundled config parses as YAML")
     void bundledConfigParses(String resourceName) {
         Assertions.assertDoesNotThrow(() -> load(resourceName),
@@ -79,21 +81,26 @@ class BundledResourceTest {
     }
 
     @Test
-    @DisplayName("every MessageKeys constant resolves to a value in messages.yml")
+    @DisplayName("every MessageKeys constant resolves to a value in messages.properties")
     void everyMessageKeyIsDefined() throws Exception {
-        YamlConfiguration root = load("messages");
+        Properties messages = new Properties();
+        try (InputStream stream = BundledResourceTest.class.getResourceAsStream("/messages.properties")) {
+            Assertions.assertNotNull(stream, "messages.properties is missing from the jar");
+            try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                messages.load(reader);
+            }
+        }
+
         List<String> missing = new ArrayList<>();
         for (String key : declaredMessageKeys()) {
-            // A message is either one line or a list of them (help pages, info blocks), so this
-            // asks only that something is there — not that it is a scalar.
-            if (!root.contains(key) || root.get(key) == null) {
+            if (messages.getProperty(key) == null) {
                 missing.add(key);
             }
         }
-        // Also catches structural damage: a mis-quoted value swallows its siblings into another
-        // node, so their keys stop resolving even while the file still parses.
+        // Also catches structural damage: a mis-quoted value swallows its siblings, so their keys
+        // stop resolving even while the file still loads.
         Assertions.assertTrue(missing.isEmpty(),
-                "message keys with no value in messages.yml: " + missing);
+                "message keys with no value in messages.properties: " + missing);
     }
 
     /**

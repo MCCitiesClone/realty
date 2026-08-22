@@ -13,12 +13,12 @@ import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.entity.HistoryEntry;
 import io.github.md5sha256.realty.party.PartyNames;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public record HistoryCommand(@NotNull RealtyPaperApi api,
                               @NotNull AtomicReference<Settings> settings,
-                              @NotNull MessageContainer messages,
+                              @NotNull Message messages,
                               @NotNull PartyService parties) implements CustomCommandBean.Single {
 
     private static final int PAGE_SIZE = 10;
@@ -119,7 +119,7 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -138,22 +138,22 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                 .thenAccept(result -> {
                     int totalCount = result.totalCount();
                     if (totalCount == 0) {
-                        sender.sendMessage(messages.messageFor(MessageKeys.HISTORY_NO_RESULTS,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.HISTORY_NO_RESULTS,
+                                "region", regionId));
                         return;
                     }
 
                     int totalPages = (totalCount + PAGE_SIZE - 1) / PAGE_SIZE;
                     if (page > totalPages) {
-                        sender.sendMessage(messages.messageFor(MessageKeys.HISTORY_INVALID_PAGE,
-                                Placeholder.unparsed("page", String.valueOf(page)),
-                                Placeholder.unparsed("total", String.valueOf(totalPages))));
+                        sender.sendMessage(messages.component(MessageKeys.HISTORY_INVALID_PAGE,
+                                "page", String.valueOf(page),
+                                "total", String.valueOf(totalPages)));
                         return;
                     }
 
                     TextComponent.Builder builder = Component.text();
-                    builder.append(messages.messageFor(MessageKeys.HISTORY_HEADER,
-                            Placeholder.unparsed("region", regionId)));
+                    builder.append(messages.component(MessageKeys.HISTORY_HEADER,
+                            "region", regionId));
 
                     for (HistoryEntry entry : result.entries()) {
                         builder.appendNewline();
@@ -161,36 +161,35 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                             case HistoryEntry.Freehold freehold -> {
                                 String messageKey = resolveEventMessageKey(freehold.eventType());
                                 builder.append(
-                                        messages.messageFor(messageKey,
-                                                Placeholder.unparsed("time", DateFormatter.format(settings.get().dateFormat(), freehold.eventTime())),
-                                                Placeholder.unparsed("buyer", resolveName(freehold.buyerId())),
-                                                Placeholder.unparsed("authority", resolveName(freehold.authorityId())),
-                                                Placeholder.unparsed("price", CurrencyFormatter.format(freehold.price()))));
+                                        messages.component(messageKey,
+                                                "time", DateFormatter.format(settings.get().dateFormat(), freehold.eventTime()),
+                                                "buyer", resolveName(freehold.buyerId()),
+                                                "authority", resolveName(freehold.authorityId()),
+                                                "price", CurrencyFormatter.format(freehold.price())));
                             }
                             case HistoryEntry.Agent agent -> {
                                 String messageKey = resolveEventMessageKey(agent.eventType());
                                 builder.append(
-                                        messages.messageFor(messageKey,
-                                                Placeholder.unparsed("time", DateFormatter.format(settings.get().dateFormat(), agent.eventTime())),
-                                                Placeholder.unparsed("agent", resolveName(agent.agentId())),
-                                                Placeholder.unparsed("actor", resolveName(agent.actorId()))));
+                                        messages.component(messageKey,
+                                                "time", DateFormatter.format(settings.get().dateFormat(), agent.eventTime()),
+                                                "agent", resolveName(agent.agentId()),
+                                                "actor", resolveName(agent.actorId())));
                             }
                             case HistoryEntry.Leasehold lease -> {
                                 String messageKey = resolveLeaseholdEventMessageKey(lease.eventType());
                                 builder.append(
-                                        messages.messageFor(messageKey,
-                                                Placeholder.unparsed("time", DateFormatter.format(settings.get().dateFormat(), lease.eventTime())),
-                                                Placeholder.unparsed("tenant", resolveName(lease.tenantId())),
-                                                Placeholder.unparsed("landlord", resolveName(lease.landlordId())),
-                                                Placeholder.unparsed("price",
-                                                        lease.price() != null ? CurrencyFormatter.format(lease.price()) : "N/A"),
+                                        messages.component(messageKey,
+                                                "time", DateFormatter.format(settings.get().dateFormat(), lease.eventTime()),
+                                                "tenant", resolveName(lease.tenantId()),
+                                                "landlord", resolveName(lease.landlordId()),
+                                                "price", lease.price() != null ? CurrencyFormatter.format(lease.price()) : "N/A",
                                                 // <changes> labels extensionsRemaining as "Max Extensions", which only
                                                 // holds true for the modification-proposal events (MODIFY_PROPOSE/ACCEPT/
                                                 // REJECT/WITHDRAW store the proposed cap there). RENEW/MODIFY_APPLY store
                                                 // the remaining count instead, so their templates use <price>, not <changes>.
-                                                Placeholder.component("changes", LeaseholdChangeSummary.render(
+                                                "changes", LeaseholdChangeSummary.render(
                                                         messages, lease.price(), lease.durationSeconds(),
-                                                        lease.extensionsRemaining()))));
+                                                        lease.extensionsRemaining())));
                             }
                         }
                     }
@@ -199,8 +198,8 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                     sender.sendMessage(builder.build());
                 }).exceptionally(ex -> {
                     ex.printStackTrace();
-                    sender.sendMessage(messages.messageFor(MessageKeys.HISTORY_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.HISTORY_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -215,11 +214,11 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                 ? buildNavComponent(MessageKeys.HISTORY_NEXT, regionId, eventType, timeDuration, playerId, page + 1)
                 : Component.empty();
         builder.appendNewline()
-                .append(messages.messageFor(MessageKeys.HISTORY_FOOTER,
-                        Placeholder.unparsed("page", String.valueOf(page)),
-                        Placeholder.unparsed("total", String.valueOf(totalPages)),
-                        Placeholder.component("previous", previousComponent),
-                        Placeholder.component("next", nextComponent)));
+                .append(messages.component(MessageKeys.HISTORY_FOOTER,
+                        "page", String.valueOf(page),
+                        "total", String.valueOf(totalPages),
+                        "previous", previousComponent,
+                        "next", nextComponent));
     }
 
     private @NotNull Component buildNavComponent(@NotNull String key, @NotNull String regionId,
@@ -238,9 +237,10 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
             command.append(" --player ").append(name);
         }
         command.append(" --page ").append(targetPage);
-        String raw = messages.miniMessageFormattedFor(key);
-        raw = raw.replace("<command>", command.toString());
-        return messages.deserializeRaw(raw);
+        // The command goes inside a <click:run_command:...> argument, which no resolver can fill;
+        // format() substitutes into the pattern before it is deserialized.
+        return MiniMessage.miniMessage().deserialize(
+                messages.format(key, "command", command.toString()));
     }
 
     private static @NotNull String resolveEventMessageKey(@NotNull String eventType) {

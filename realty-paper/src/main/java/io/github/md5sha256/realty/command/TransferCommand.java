@@ -9,9 +9,8 @@ import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.party.PartyNames;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -32,7 +31,7 @@ import java.util.UUID;
  */
 public record TransferCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events,
         @NotNull PartyService parties
 ) implements CustomCommandBean.Single {
@@ -59,38 +58,38 @@ public record TransferCommand(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         if (sender instanceof Player player
                 && !sender.hasPermission("realty.command.transfer.others")
                 && !region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.TRANSFER_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.TRANSFER_NO_PERMISSION));
             return;
         }
         if (!events.fireSync(new TitleTransferEvent(region, titleHolderId))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.transferTitleHolder(region, titleHolderId).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.SetTitleHolderResult.Success success -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.TRANSFER_SUCCESS,
-                                Placeholder.unparsed("titleholder", resolveName(titleHolderId)),
-                                Placeholder.unparsed("region", success.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.TRANSFER_SUCCESS,
+                                "titleholder", resolveName(titleHolderId),
+                                "region", success.regionId()));
                         events.fireSync(new TitleTransferredEvent(region, titleHolderId,
                                 success.previousTitleHolder()));
                 }
                 case RealtyPaperApi.SetTitleHolderResult.NoFreeholdContract noContract ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TRANSFER_NO_FREEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", noContract.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.TRANSFER_NO_FREEHOLD_CONTRACT,
+                                "region", noContract.regionId()));
                 case RealtyPaperApi.SetTitleHolderResult.UpdateFailed updateFailed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TRANSFER_UPDATE_FAILED,
-                                Placeholder.unparsed("region", updateFailed.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.TRANSFER_UPDATE_FAILED,
+                                "region", updateFailed.regionId()));
                 case RealtyPaperApi.SetTitleHolderResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TRANSFER_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.TRANSFER_ERROR,
+                                "error", error.message()));
             }
         });
     }

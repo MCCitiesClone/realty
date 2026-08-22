@@ -4,9 +4,8 @@ import io.github.md5sha256.realty.api.RealtyBackend;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -24,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public record RentableCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean.Single {
 
     @Override
@@ -40,14 +39,14 @@ public record RentableCommand(
 
     private void execute(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         boolean accepting = ctx.get("accepting");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         boolean bypass = sender.hasPermission("realty.command.rentable.others");
@@ -56,27 +55,27 @@ public record RentableCommand(
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.SetRentableResult.Success success ->
-                                sender.sendMessage(messages.messageFor(success.acceptingTenants()
+                                sender.sendMessage(messages.component(success.acceptingTenants()
                                                 ? MessageKeys.RENTABLE_ENABLED : MessageKeys.RENTABLE_DISABLED,
-                                        Placeholder.unparsed("region", regionId)));
+                                        "region", regionId));
                         case RealtyBackend.SetRentableResult.NoChange noChange ->
-                                sender.sendMessage(messages.messageFor(noChange.acceptingTenants()
+                                sender.sendMessage(messages.component(noChange.acceptingTenants()
                                                 ? MessageKeys.RENTABLE_ALREADY_ENABLED
                                                 : MessageKeys.RENTABLE_ALREADY_DISABLED,
-                                        Placeholder.unparsed("region", regionId)));
+                                        "region", regionId));
                         case RealtyBackend.SetRentableResult.NoLeaseholdContract ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.RENTABLE_NO_LEASEHOLD_CONTRACT,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.RENTABLE_NO_LEASEHOLD_CONTRACT,
+                                        "region", regionId));
                         case RealtyBackend.SetRentableResult.NotAuthorized ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.RENTABLE_NOT_LANDLORD,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.RENTABLE_NOT_LANDLORD,
+                                        "region", regionId));
                         case RealtyBackend.SetRentableResult.UpdateFailed ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.RENTABLE_UPDATE_FAILED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.RENTABLE_UPDATE_FAILED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.RENTABLE_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(ex.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.RENTABLE_ERROR,
+                            "error", String.valueOf(ex.getMessage())));
                     return null;
                 });
     }

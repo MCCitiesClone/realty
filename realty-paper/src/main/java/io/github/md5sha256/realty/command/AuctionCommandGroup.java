@@ -21,12 +21,11 @@ import io.github.md5sha256.realty.database.entity.FreeholdContractAuctionEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractBid;
 import io.github.md5sha256.realty.party.PartyNames;
 import io.github.md5sha256.realty.party.PartyService;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -54,7 +53,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public record AuctionCommandGroup(
         @NotNull RealtyPaperApi api,
         @NotNull AtomicReference<Settings> settings,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events,
         @NotNull PartyService parties
 ) implements CustomCommandBean {
@@ -107,7 +106,7 @@ public record AuctionCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -117,13 +116,13 @@ public record AuctionCommandGroup(
             try {
                 FreeholdContractAuctionEntity auction = regionInfo.auction();
                 if (auction == null) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_INFO_NO_AUCTION,
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.AUCTION_INFO_NO_AUCTION,
+                            "region", regionId));
                     return;
                 }
                 TextComponent.Builder textBuilder = Component.text();
-                textBuilder.append(messages.messageFor(MessageKeys.AUCTION_INFO_HEADER,
-                        Placeholder.unparsed("region", regionId)));
+                textBuilder.append(messages.component(MessageKeys.AUCTION_INFO_HEADER,
+                        "region", regionId));
                 FreeholdContractBid highestBid = regionInfo.highestBid();
                 String highestBidAmount = highestBid != null ? CurrencyFormatter.format(highestBid.bidAmount()) : "N/A";
                 String highestBidPlayer = highestBid != null ? resolveName(highestBid.bidderId()) : "N/A";
@@ -131,21 +130,20 @@ public record AuctionCommandGroup(
                 LocalDateTime biddingEndDate = lastActivity.plusSeconds(auction.biddingDurationSeconds());
 
                 textBuilder.appendNewline()
-                        .append(messages.messageFor(MessageKeys.AUCTION_INFO_DETAILS,
-                                Placeholder.unparsed("auctioneer", resolveName(auction.auctioneerId())),
-                                Placeholder.unparsed("start_date", DateFormatter.format(settings.get().dateFormat(), auction.startDate())),
-                                Placeholder.unparsed("duration",
-                                        DurationFormatter.format(Duration.ofSeconds(auction.biddingDurationSeconds()))),
-                                Placeholder.unparsed("bidding_end_date", DateFormatter.format(settings.get().dateFormat(), biddingEndDate)),
-                                Placeholder.unparsed("deadline", DateFormatter.format(settings.get().dateFormat(), auction.paymentDeadline())),
-                                Placeholder.unparsed("min_bid", CurrencyFormatter.format(auction.minBid())),
-                                Placeholder.unparsed("min_step", CurrencyFormatter.format(auction.minStep())),
-                                Placeholder.unparsed("highest_bid_amount", highestBidAmount),
-                                Placeholder.unparsed("highest_bid_player", highestBidPlayer)));
+                        .append(messages.component(MessageKeys.AUCTION_INFO_DETAILS,
+                                "auctioneer", resolveName(auction.auctioneerId()),
+                                "start_date", DateFormatter.format(settings.get().dateFormat(), auction.startDate()),
+                                "duration", DurationFormatter.format(Duration.ofSeconds(auction.biddingDurationSeconds())),
+                                "bidding_end_date", DateFormatter.format(settings.get().dateFormat(), biddingEndDate),
+                                "deadline", DateFormatter.format(settings.get().dateFormat(), auction.paymentDeadline()),
+                                "min_bid", CurrencyFormatter.format(auction.minBid()),
+                                "min_step", CurrencyFormatter.format(auction.minStep()),
+                                "highest_bid_amount", highestBidAmount,
+                                "highest_bid_player", highestBidPlayer));
                 sender.sendMessage(textBuilder.build());
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_INFO_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.AUCTION_INFO_ERROR,
+                        "error", ex.getMessage()));
             }
         });
     }
@@ -159,7 +157,7 @@ public record AuctionCommandGroup(
     private void executeCreate(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         Duration bidDuration = ctx.get("bidDuration");
@@ -169,13 +167,13 @@ public record AuctionCommandGroup(
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(player.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         if (!events.fireSync(new AuctionCreateEvent(region, player.getUniqueId(), minBid, minBidStep,
                 bidDuration.toSeconds(), paymentDuration.toSeconds()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.createAuction(
@@ -189,24 +187,24 @@ public record AuctionCommandGroup(
         ).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.CreateAuctionResult.Success ignored -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_SUCCESS,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AUCTION_SUCCESS,
+                                "region", regionId));
                         events.fireSync(new AuctionCreatedEvent(region, player.getUniqueId(),
                                 minBid, minBidStep));
                 }
                 case RealtyBackend.CreateAuctionResult.NotSanctioned ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_NOT_SANCTIONED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AUCTION_NOT_SANCTIONED,
+                                "region", regionId));
                 case RealtyBackend.CreateAuctionResult.NoFreeholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_NO_FREEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AUCTION_NO_FREEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.CreateAuctionResult.OffersExist ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_OFFERS_EXIST,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AUCTION_OFFERS_EXIST,
+                                "region", regionId));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.AUCTION_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.AUCTION_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }
@@ -219,28 +217,28 @@ public record AuctionCommandGroup(
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         api.cancelAuction(regionId, region.world().getUID()).thenAccept(result -> {
             if (result.deleted() == 0) {
-                sender.sendMessage(messages.messageFor(MessageKeys.CANCEL_AUCTION_NO_AUCTION));
+                sender.sendMessage(messages.component(MessageKeys.CANCEL_AUCTION_NO_AUCTION));
                 return;
             }
-            sender.sendMessage(messages.messageFor(MessageKeys.CANCEL_AUCTION_SUCCESS,
-                    Placeholder.unparsed("region", regionId)));
+            sender.sendMessage(messages.component(MessageKeys.CANCEL_AUCTION_SUCCESS,
+                    "region", regionId));
             for (UUID bidderId : result.bidderIds()) {
                 events.fireSync(new RealtyNotificationEvent(List.of(bidderId),
-                        messages.messageFor(MessageKeys.NOTIFICATION_AUCTION_CANCELLED,
-                                Placeholder.unparsed("region", regionId)), region));
+                        messages.component(MessageKeys.NOTIFICATION_AUCTION_CANCELLED,
+                                "region", regionId), region));
             }
             if (sender instanceof Player canceller) {
                 events.fireSync(new AuctionCancelledEvent(region, canceller.getUniqueId()));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.CANCEL_AUCTION_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.CANCEL_AUCTION_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }
@@ -249,52 +247,52 @@ public record AuctionCommandGroup(
 
     private void executeBid(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         double bidAmount = ctx.<Double>get("bid");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         if (!events.fireSync(new AuctionBidEvent(region, sender.getUniqueId(), bidAmount))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.performBid(regionId, region.world().getUID(), sender.getUniqueId(), bidAmount)
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.BidResult.Success success -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.BID_SUCCESS,
-                                    Placeholder.unparsed("amount", CurrencyFormatter.format(bidAmount)),
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.BID_SUCCESS,
+                                    "amount", CurrencyFormatter.format(bidAmount),
+                                    "region", regionId));
                             if (success.previousBidderId() != null) {
                                 events.fireSync(new RealtyNotificationEvent(List.of(success.previousBidderId()),
-                                        messages.messageFor(MessageKeys.NOTIFICATION_OUTBID,
-                                                Placeholder.unparsed("region", regionId),
-                                                Placeholder.unparsed("amount", CurrencyFormatter.format(bidAmount))), region));
+                                        messages.component(MessageKeys.NOTIFICATION_OUTBID,
+                                                "region", regionId,
+                                                "amount", CurrencyFormatter.format(bidAmount)), region));
                             }
                             events.fireSync(new AuctionBidPlacedEvent(region, sender.getUniqueId(), bidAmount));
                         }
                         case RealtyBackend.BidResult.NoAuction ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.BID_NO_AUCTION));
+                                sender.sendMessage(messages.component(MessageKeys.BID_NO_AUCTION));
                         case RealtyBackend.BidResult.IsOwner ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.BID_IS_OWNER));
+                                sender.sendMessage(messages.component(MessageKeys.BID_IS_OWNER));
                         case RealtyBackend.BidResult.BidTooLowMinimum r ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.BID_TOO_LOW_MINIMUM,
-                                        Placeholder.unparsed("amount", CurrencyFormatter.format(r.minBid()))));
+                                sender.sendMessage(messages.component(MessageKeys.BID_TOO_LOW_MINIMUM,
+                                        "amount", CurrencyFormatter.format(r.minBid())));
                         case RealtyBackend.BidResult.BidTooLowCurrent r ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.BID_TOO_LOW_CURRENT,
-                                        Placeholder.unparsed("amount", CurrencyFormatter.format(r.currentHighest()))));
+                                sender.sendMessage(messages.component(MessageKeys.BID_TOO_LOW_CURRENT,
+                                        "amount", CurrencyFormatter.format(r.currentHighest())));
                         case RealtyBackend.BidResult.AlreadyHighestBidder ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.BID_ALREADY_HIGHEST));
+                                sender.sendMessage(messages.component(MessageKeys.BID_ALREADY_HIGHEST));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.BID_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.BID_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -303,59 +301,59 @@ public record AuctionCommandGroup(
 
     private void executePayBid(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         double amount = ctx.get("amount");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         api.payBid(region, sender.getUniqueId(), amount).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.PayBidResult.Success success ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_SUCCESS,
-                                Placeholder.unparsed("amount", CurrencyFormatter.format(success.amount())),
-                                Placeholder.unparsed("region", success.regionId()),
-                                Placeholder.unparsed("total", CurrencyFormatter.format(success.newTotal())),
-                                Placeholder.unparsed("remaining", CurrencyFormatter.format(success.remaining()))));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_SUCCESS,
+                                "amount", CurrencyFormatter.format(success.amount()),
+                                "region", success.regionId(),
+                                "total", CurrencyFormatter.format(success.newTotal()),
+                                "remaining", CurrencyFormatter.format(success.remaining())));
                 case RealtyPaperApi.PayBidResult.FullyPaid fullyPaid -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_TRANSFER_SUCCESS,
-                            Placeholder.unparsed("region", fullyPaid.regionId())));
+                    sender.sendMessage(messages.component(MessageKeys.PAY_BID_TRANSFER_SUCCESS,
+                            "region", fullyPaid.regionId()));
                     if (fullyPaid.previousTitleHolderId() != null) {
                         events.fireSync(new RealtyNotificationEvent(List.of(fullyPaid.previousTitleHolderId()),
-                                messages.messageFor(MessageKeys.NOTIFICATION_OWNERSHIP_TRANSFERRED,
-                                        Placeholder.unparsed("player", sender.getName()),
-                                        Placeholder.unparsed("region", fullyPaid.regionId())), region));
+                                messages.component(MessageKeys.NOTIFICATION_OWNERSHIP_TRANSFERRED,
+                                        "player", sender.getName(),
+                                        "region", fullyPaid.regionId()), region));
                     }
                     events.fireSync(new AuctionWonPurchaseEvent(region, sender.getUniqueId(),
                             fullyPaid.previousTitleHolderId(), fullyPaid.amount()));
                 }
                 case RealtyPaperApi.PayBidResult.NoPaymentRecord noPayment ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_NO_PAYMENT_RECORD,
-                                Placeholder.unparsed("region", noPayment.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_NO_PAYMENT_RECORD,
+                                "region", noPayment.regionId()));
                 case RealtyPaperApi.PayBidResult.PaymentExpired expired ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_PAYMENT_EXPIRED,
-                                Placeholder.unparsed("region", expired.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_PAYMENT_EXPIRED,
+                                "region", expired.regionId()));
                 case RealtyPaperApi.PayBidResult.ExceedsAmountOwed exceeds ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_EXCEEDS_OWED,
-                                Placeholder.unparsed("amount", CurrencyFormatter.format(exceeds.amount())),
-                                Placeholder.unparsed("owed", CurrencyFormatter.format(exceeds.amountOwed())),
-                                Placeholder.unparsed("region", exceeds.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_EXCEEDS_OWED,
+                                "amount", CurrencyFormatter.format(exceeds.amount()),
+                                "owed", CurrencyFormatter.format(exceeds.amountOwed()),
+                                "region", exceeds.regionId()));
                 case RealtyPaperApi.PayBidResult.InsufficientFunds insufficient ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_INSUFFICIENT_FUNDS,
-                                Placeholder.unparsed("balance", CurrencyFormatter.format(insufficient.balance()))));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_INSUFFICIENT_FUNDS,
+                                "balance", CurrencyFormatter.format(insufficient.balance())));
                 case RealtyPaperApi.PayBidResult.PaymentFailed failed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_PAYMENT_FAILED,
-                                Placeholder.unparsed("error", failed.error())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_PAYMENT_FAILED,
+                                "error", failed.error()));
                 case RealtyPaperApi.PayBidResult.TransferFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_TRANSFER_FAILED));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_TRANSFER_FAILED));
                 case RealtyPaperApi.PayBidResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_BID_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_BID_ERROR,
+                                "error", error.message()));
             }
         });
     }

@@ -7,7 +7,7 @@ import io.github.md5sha256.realty.database.SqlSessionWrapper;
 import io.github.md5sha256.realty.database.entity.OccupancyFilter;
 import io.github.md5sha256.realty.database.entity.SearchResultEntity;
 import io.github.md5sha256.realty.database.mapper.SearchMapper;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.RealtyTags;
@@ -23,10 +23,10 @@ import io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -68,7 +68,7 @@ public final class SearchDialog {
     private final Database database;
     private final ExecutorState executorState;
     private final AtomicReference<RealtyTags> realtyTags;
-    private final MessageContainer messages;
+    private final Message messages;
     private final ConcurrentHashMap<UUID, SearchState> playerStates = new ConcurrentHashMap<>();
 
     enum TagState {
@@ -97,7 +97,7 @@ public final class SearchDialog {
     public SearchDialog(@NotNull Database database,
                         @NotNull ExecutorState executorState,
                         @NotNull AtomicReference<RealtyTags> realtyTags,
-                        @NotNull MessageContainer messages) {
+                        @NotNull Message messages) {
         this.database = database;
         this.executorState = executorState;
         this.realtyTags = realtyTags;
@@ -179,7 +179,7 @@ public final class SearchDialog {
             playerStates.remove(player.getUniqueId());
 
             if (!includeFreehold && !includeLeasehold) {
-                audience.sendMessage(messages.messageFor(MessageKeys.SEARCH_NO_RESULTS));
+                audience.sendMessage(messages.component(MessageKeys.SEARCH_NO_RESULTS));
                 return;
             }
             performSearch(audience, includeFreehold, includeLeasehold, tagFilter,
@@ -329,15 +329,15 @@ public final class SearchDialog {
                         tagIds, excludedTagIds, minPrice, maxPrice, occupancy);
 
                 if (totalCount == 0) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.SEARCH_NO_RESULTS));
+                    sender.sendMessage(messages.component(MessageKeys.SEARCH_NO_RESULTS));
                     return;
                 }
 
                 int totalPages = (totalCount + PAGE_SIZE - 1) / PAGE_SIZE;
                 if (page > totalPages) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.SEARCH_INVALID_PAGE,
-                            Placeholder.unparsed("page", String.valueOf(page)),
-                            Placeholder.unparsed("total", String.valueOf(totalPages))));
+                    sender.sendMessage(messages.component(MessageKeys.SEARCH_INVALID_PAGE,
+                            "page", String.valueOf(page),
+                            "total", String.valueOf(totalPages)));
                     return;
                 }
 
@@ -346,25 +346,25 @@ public final class SearchDialog {
                         tagIds, excludedTagIds, minPrice, maxPrice, occupancy, PAGE_SIZE, offset);
 
                 TextComponent.Builder builder = Component.text();
-                builder.append(messages.messageFor(MessageKeys.SEARCH_HEADER,
-                        Placeholder.unparsed("count", String.valueOf(totalCount))));
+                builder.append(messages.component(MessageKeys.SEARCH_HEADER,
+                        "count", String.valueOf(totalCount)));
 
                 for (SearchResultEntity result : results) {
                     String typeLabel = "freehold".equals(result.contractType())
                             ? "Freehold" : "Leasehold";
                     builder.appendNewline();
                     builder.append(parseMiniMessage(MessageKeys.SEARCH_ENTRY,
-                            "<region>", result.worldGuardRegionId(),
-                            "<type>", typeLabel,
-                            "<price>", CurrencyFormatter.format(result.price())));
+                            "region", result.worldGuardRegionId(),
+                            "type", typeLabel,
+                            "price", CurrencyFormatter.format(result.price())));
                 }
 
                 appendFooter(builder, includeFreehold, includeLeasehold, tagIds, excludedTagIds,
                         minPrice, maxPrice, occupancy, page, totalPages);
                 sender.sendMessage(builder.build());
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.SEARCH_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.SEARCH_ERROR,
+                        "error", ex.getMessage()));
             }
         }, executorState.dbExec());
     }
@@ -397,11 +397,11 @@ public final class SearchDialog {
                 tagIds, excludedTagIds, minPrice, maxPrice, occupancy, page + 1)
                 : Component.empty();
         builder.appendNewline()
-                .append(messages.messageFor(MessageKeys.SEARCH_FOOTER,
-                        Placeholder.unparsed("page", String.valueOf(page)),
-                        Placeholder.unparsed("total", String.valueOf(totalPages)),
-                        Placeholder.component("previous", previousComponent),
-                        Placeholder.component("next", nextComponent)));
+                .append(messages.component(MessageKeys.SEARCH_FOOTER,
+                        "page", String.valueOf(page),
+                        "total", String.valueOf(totalPages),
+                        "previous", previousComponent,
+                        "next", nextComponent));
     }
 
     private @NotNull Component buildNavComponent(@NotNull String key,
@@ -434,16 +434,25 @@ public final class SearchDialog {
             command.append(" --occupancy ").append(occupancy.name());
         }
         command.append(" --page ").append(targetPage);
-        return parseMiniMessage(key, "<command>", command.toString());
+        return parseMiniMessage(key, "command", command.toString());
     }
 
+    /**
+     * Renders a message whose placeholders sit inside a MiniMessage tag argument — the click
+     * targets on the pagination links and result rows.
+     *
+     * <p>{@code Message.component} rewrites each placeholder into a generated MiniMessage tag and
+     * lets a resolver fill it, which cannot reach inside another tag's argument. {@code format}
+     * substitutes textually into the pattern first, so the finished string is deserialized here
+     * with the click target already in place.</p>
+     *
+     * <p>Values passed this way are interpolated as markup rather than escaped, so they must be
+     * plugin-authored: region ids, formatted prices and commands this class builds, never
+     * player-supplied text.</p>
+     */
     private @NotNull Component parseMiniMessage(@NotNull String key,
-                                                @NotNull String... replacements) {
-        String raw = messages.miniMessageFormattedFor(key);
-        for (int i = 0; i < replacements.length; i += 2) {
-            raw = raw.replace(replacements[i], replacements[i + 1]);
-        }
-        return messages.deserializeRaw(raw);
+                                                @NotNull Object... replacements) {
+        return MiniMessage.miniMessage().deserialize(messages.format(key, replacements));
     }
 
 }

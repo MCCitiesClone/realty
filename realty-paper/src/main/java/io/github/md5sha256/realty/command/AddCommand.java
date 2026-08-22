@@ -4,9 +4,8 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.GroupPrefix;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.incendo.cloud.paper.util.sender.Source;
 
 import org.bukkit.Bukkit;
@@ -28,7 +27,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>Base permission: {@code realty.command.add}.
  * Acting on another player's region additionally requires {@code realty.command.add.others}.</p>
  */
-public record AddCommand(@NotNull MessageContainer messages) implements CustomCommandBean.Single {
+public record AddCommand(@NotNull Message messages) implements CustomCommandBean.Single {
 
     @Override
     public @NotNull Command<? extends Source> command(@NotNull Command.Builder<Source> builder) {
@@ -57,7 +56,7 @@ public record AddCommand(@NotNull MessageContainer messages) implements CustomCo
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -65,7 +64,7 @@ public record AddCommand(@NotNull MessageContainer messages) implements CustomCo
         if (sender instanceof Player player
                 && !sender.hasPermission("realty.command.add.others")
                 && !region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ADD_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.ADD_NO_PERMISSION));
             return;
         }
         ProtectedRegion protectedRegion = region.region();
@@ -76,9 +75,9 @@ public record AddCommand(@NotNull MessageContainer messages) implements CustomCo
             OfflinePlayer target = Bukkit.getOfflinePlayer(playerOrGroup);
             protectedRegion.getMembers().addPlayer(target.getUniqueId());
         }
-        sender.sendMessage(messages.messageFor(MessageKeys.ADD_SUCCESS,
-                Placeholder.unparsed("target", playerOrGroup),
-                Placeholder.unparsed("region", regionId)));
+        sender.sendMessage(messages.component(MessageKeys.ADD_SUCCESS,
+                "target", playerOrGroup,
+                "region", regionId));
     }
 
 }

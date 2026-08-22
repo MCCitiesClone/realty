@@ -15,10 +15,9 @@ import io.github.md5sha256.realty.database.entity.LeaseholdModificationView;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.party.PartyNames;
 import io.github.md5sha256.realty.party.PartyService;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -50,7 +49,7 @@ import java.util.UUID;
  */
 public record ModifyCommandGroup(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events,
         @NotNull PartyService parties
 ) implements CustomCommandBean {
@@ -107,20 +106,20 @@ public record ModifyCommandGroup(
 
     private void executeInbox(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         api.listModificationsAwaitingLandlord(sender.getUniqueId()).thenAccept(views -> {
             if (views.isEmpty()) {
-                sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_INBOX_NONE));
+                sender.sendMessage(messages.component(MessageKeys.MODIFY_INBOX_NONE));
                 return;
             }
-            Component output = messages.messageFor(MessageKeys.MODIFY_INBOX_HEADER);
+            Component output = messages.component(MessageKeys.MODIFY_INBOX_HEADER);
             for (LeaseholdModificationView view : views) {
-                output = output.appendNewline().append(messages.messageFor(MessageKeys.MODIFY_INBOX_ENTRY,
-                        Placeholder.unparsed("region", view.worldGuardRegionId()),
-                        Placeholder.unparsed("player", resolveName(view.proposerId())),
-                        Placeholder.component("changes", describeChanges(view))));
+                output = output.appendNewline().append(messages.component(MessageKeys.MODIFY_INBOX_ENTRY,
+                        "region", view.worldGuardRegionId(),
+                        "player", resolveName(view.proposerId()),
+                        "changes", describeChanges(view)));
             }
             sender.sendMessage(output);
         });
@@ -128,22 +127,22 @@ public record ModifyCommandGroup(
 
     private void executeOutbox(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         api.listPendingModificationsByProposer(sender.getUniqueId()).thenAccept(views -> {
             if (views.isEmpty()) {
-                sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_OUTBOX_NONE));
+                sender.sendMessage(messages.component(MessageKeys.MODIFY_OUTBOX_NONE));
                 return;
             }
-            Component output = messages.messageFor(MessageKeys.MODIFY_OUTBOX_HEADER);
+            Component output = messages.component(MessageKeys.MODIFY_OUTBOX_HEADER);
             for (LeaseholdModificationView view : views) {
                 String statusKey = LeaseholdModificationStatus.ACTIVE.equals(view.status())
                         ? MessageKeys.MODIFY_STATUS_ACTIVE : MessageKeys.MODIFY_STATUS_AWAITING;
-                output = output.appendNewline().append(messages.messageFor(MessageKeys.MODIFY_OUTBOX_ENTRY,
-                        Placeholder.unparsed("region", view.worldGuardRegionId()),
-                        Placeholder.component("changes", describeChanges(view)),
-                        Placeholder.component("status", messages.messageFor(statusKey))));
+                output = output.appendNewline().append(messages.component(MessageKeys.MODIFY_OUTBOX_ENTRY,
+                        "region", view.worldGuardRegionId(),
+                        "changes", describeChanges(view),
+                        "status", messages.component(statusKey)));
             }
             sender.sendMessage(output);
         });
@@ -178,17 +177,17 @@ public record ModifyCommandGroup(
                                 @Nullable Double price, @Nullable Long durationSeconds,
                                 @Nullable Integer maxExtensions) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         if (!events.fireSync(new LeaseModifyProposeEvent(region, sender.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         boolean bypass = sender.hasPermission("realty.command.modify.others");
@@ -200,42 +199,42 @@ public record ModifyCommandGroup(
                     String key = success.active()
                             ? MessageKeys.MODIFY_PROPOSE_SUCCESS_LANDLORD
                             : MessageKeys.MODIFY_PROPOSE_SUCCESS_TENANT;
-                    sender.sendMessage(messages.messageFor(key, Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(key, "region", regionId));
                     events.fireSync(new LeaseModificationProposedEvent(region, success.proposerRole(),
                             sender.getUniqueId(), success.landlordId(), success.tenantId(), success.active()));
                 }
                 case RealtyBackend.ProposeModificationResult.NoLeaseholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_NO_LEASEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.ProposeModificationResult.NotOccupied ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_NOT_OCCUPIED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_NOT_OCCUPIED,
+                                "region", regionId));
                 case RealtyBackend.ProposeModificationResult.Terminating ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_TERMINATING,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_TERMINATING,
+                                "region", regionId));
                 case RealtyBackend.ProposeModificationResult.NotAuthorized ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_NOT_AUTHORIZED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_NOT_AUTHORIZED,
+                                "region", regionId));
                 case RealtyBackend.ProposeModificationResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_UPDATE_FAILED,
+                                "region", regionId));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_ERROR,
-                    Placeholder.unparsed("error", String.valueOf(ex.getMessage()))));
+            sender.sendMessage(messages.component(MessageKeys.MODIFY_ERROR,
+                    "error", String.valueOf(ex.getMessage())));
             return null;
         });
     }
 
     private void executeResolve(@NotNull CommandContext<Source> ctx, @NotNull ResolveAction action) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         boolean bypass = sender.hasPermission("realty.command.modify.others");
@@ -250,33 +249,33 @@ public record ModifyCommandGroup(
         future.thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.ResolveModificationResult.Success success -> {
-                    sender.sendMessage(messages.messageFor(action.successKey,
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(action.successKey,
+                            "region", regionId));
                     events.fireSync(new LeaseModificationResolvedEvent(region, action.resolution,
                             success.proposerRole(), success.landlordId(), success.tenantId()));
                 }
                 case RealtyBackend.ResolveModificationResult.NoLeaseholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_NO_LEASEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyBackend.ResolveModificationResult.NoPendingProposal ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_NO_PENDING_PROPOSAL,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_NO_PENDING_PROPOSAL,
+                                "region", regionId));
                 case RealtyBackend.ResolveModificationResult.NotTenantProposal ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_NOT_TENANT_PROPOSAL,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_NOT_TENANT_PROPOSAL,
+                                "region", regionId));
                 case RealtyBackend.ResolveModificationResult.NotAuthorized ignored ->
-                        sender.sendMessage(messages.messageFor(
+                        sender.sendMessage(messages.component(
                                 action == ResolveAction.WITHDRAW
                                         ? MessageKeys.MODIFY_NOT_PROPOSER
                                         : MessageKeys.MODIFY_NOT_LANDLORD,
-                                Placeholder.unparsed("region", regionId)));
+                                "region", regionId));
                 case RealtyBackend.ResolveModificationResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.MODIFY_UPDATE_FAILED,
+                                "region", regionId));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.MODIFY_ERROR,
-                    Placeholder.unparsed("error", String.valueOf(ex.getMessage()))));
+            sender.sendMessage(messages.component(MessageKeys.MODIFY_ERROR,
+                    "error", String.valueOf(ex.getMessage())));
             return null;
         });
     }

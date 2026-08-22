@@ -8,10 +8,9 @@ import io.github.md5sha256.realty.api.event.AgentInviteWithdrawnEvent;
 import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import org.incendo.cloud.paper.util.sender.Source;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -30,7 +29,7 @@ import java.util.UUID;
  * <p>Permission: {@code realty.command.agent.invite.withdraw}.</p>
  */
 public record AgentInviteWithdrawCommand(@NotNull RealtyPaperApi api,
-                                          @NotNull MessageContainer messages,
+                                          @NotNull Message messages,
                                           @NotNull RealtyEventDispatch events) implements CustomCommandBean.Single {
 
     @Override
@@ -49,45 +48,45 @@ public record AgentInviteWithdrawCommand(@NotNull RealtyPaperApi api,
     private void execute(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         UUID inviteeId = ctx.get("player");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(player.getLocation()));
         if (region == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            player.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         UUID worldId = region.world().getUID();
         String inviteeName = resolveName(inviteeId);
         if (!region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_WITHDRAW_NOT_FOUND,
-                    Placeholder.unparsed("player", inviteeName),
-                    Placeholder.unparsed("region", regionId)));
+            sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_WITHDRAW_NOT_FOUND,
+                    "player", inviteeName,
+                    "region", regionId));
             return;
         }
         api.withdrawAgentInvite(regionId, worldId, inviteeId).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.WithdrawAgentInviteResult.Success() -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_WITHDRAW_SUCCESS,
-                            Placeholder.unparsed("player", inviteeName),
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_WITHDRAW_SUCCESS,
+                            "player", inviteeName,
+                            "region", regionId));
                     events.fireSync(new RealtyNotificationEvent(List.of(inviteeId),
-                            messages.messageFor(MessageKeys.NOTIFICATION_AGENT_INVITE_WITHDRAWN,
-                                    Placeholder.unparsed("player", resolveName(player.getUniqueId())),
-                                    Placeholder.unparsed("region", regionId)), region));
+                            messages.component(MessageKeys.NOTIFICATION_AGENT_INVITE_WITHDRAWN,
+                                    "player", resolveName(player.getUniqueId()),
+                                    "region", regionId), region));
                     events.fireSync(new AgentInviteWithdrawnEvent(region, player.getUniqueId(), inviteeId));
                 }
                 case RealtyBackend.WithdrawAgentInviteResult.NotFound() ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_WITHDRAW_NOT_FOUND,
-                                Placeholder.unparsed("player", inviteeName),
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_WITHDRAW_NOT_FOUND,
+                                "player", inviteeName,
+                                "region", regionId));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_WITHDRAW_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_WITHDRAW_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }

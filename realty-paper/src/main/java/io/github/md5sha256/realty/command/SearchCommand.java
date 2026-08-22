@@ -1,7 +1,7 @@
 package io.github.md5sha256.realty.command;
 
 import io.github.md5sha256.realty.database.entity.OccupancyFilter;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -28,7 +28,7 @@ import java.util.List;
  */
 public record SearchCommand(
         @NotNull SearchDialog searchDialog,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     private static final CommandFlag<Void> FREEHOLD_FLAG =
@@ -96,7 +96,7 @@ public record SearchCommand(
     private void openDialog(@NotNull CommandContext<? extends Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         searchDialog.open(player);

@@ -7,11 +7,11 @@ import io.github.md5sha256.realty.command.util.NamedAuthorityParser;
 import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
 import io.github.md5sha256.realty.database.entity.RealtyRegionEntity;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -33,7 +33,7 @@ import java.util.UUID;
  */
 public record ListCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull PartyService parties
 ) implements CustomCommandBean {
 
@@ -96,7 +96,7 @@ public record ListCommand(
             resolvePlayer(sender, authority, category, page);
         } else {
             if (!(sender instanceof Player player)) {
-                sender.sendMessage(messages.messageFor(MessageKeys.LIST_PLAYERS_ONLY));
+                sender.sendMessage(messages.component(MessageKeys.LIST_PLAYERS_ONLY));
                 return;
             }
             listRegions(sender, player.getUniqueId(), player.getName(), category, page);
@@ -123,29 +123,29 @@ public record ListCommand(
         api.listRegions(targetId, PAGE_SIZE, globalOffset).thenAccept(result -> {
             int totalCount = result.totalCount();
             if (totalCount == 0) {
-                sender.sendMessage(messages.messageFor(MessageKeys.LIST_NO_REGIONS,
-                        Placeholder.unparsed("player", targetName)));
+                sender.sendMessage(messages.component(MessageKeys.LIST_NO_REGIONS,
+                        "player", targetName));
                 return;
             }
 
             int totalPages = (totalCount + PAGE_SIZE - 1) / PAGE_SIZE;
             if (page > totalPages) {
-                sender.sendMessage(messages.messageFor(MessageKeys.LIST_INVALID_PAGE,
-                        Placeholder.unparsed("page", String.valueOf(page)),
-                        Placeholder.unparsed("total", String.valueOf(totalPages))));
+                sender.sendMessage(messages.component(MessageKeys.LIST_INVALID_PAGE,
+                        "page", String.valueOf(page),
+                        "total", String.valueOf(totalPages)));
                 return;
             }
 
             TextComponent.Builder builder = Component.text();
-            builder.append(parseMiniMessage(MessageKeys.LIST_HEADER, "<player>", targetName));
+            builder.append(parseMiniMessage(MessageKeys.LIST_HEADER, "player", targetName));
             appendCategory(builder, "Owned", result.owned());
             appendCategory(builder, "Landlord", result.landlord());
             appendRentedCategory(builder, "Rented", result.rented());
             appendFooter(builder, targetName, null, page, totalPages);
             sender.sendMessage(builder.build());
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.LIST_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.LIST_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }
@@ -158,22 +158,22 @@ public record ListCommand(
 
         future.thenAccept(result -> {
             if (result.totalCount() == 0) {
-                sender.sendMessage(messages.messageFor(MessageKeys.LIST_NO_REGIONS,
-                        Placeholder.unparsed("player", targetName)));
+                sender.sendMessage(messages.component(MessageKeys.LIST_NO_REGIONS,
+                        "player", targetName));
                 return;
             }
 
             int totalPages = (result.totalCount() + PAGE_SIZE - 1) / PAGE_SIZE;
             if (page > totalPages) {
-                sender.sendMessage(messages.messageFor(MessageKeys.LIST_INVALID_PAGE,
-                        Placeholder.unparsed("page", String.valueOf(page)),
-                        Placeholder.unparsed("total", String.valueOf(totalPages))));
+                sender.sendMessage(messages.component(MessageKeys.LIST_INVALID_PAGE,
+                        "page", String.valueOf(page),
+                        "total", String.valueOf(totalPages)));
                 return;
             }
 
             String label = "owned".equals(category) ? "Owned" : "Rented";
             TextComponent.Builder builder = Component.text();
-            builder.append(parseMiniMessage(MessageKeys.LIST_HEADER, "<player>", targetName));
+            builder.append(parseMiniMessage(MessageKeys.LIST_HEADER, "player", targetName));
             if ("owned".equals(category)) {
                 appendCategory(builder, label, result.regions());
             } else {
@@ -182,8 +182,8 @@ public record ListCommand(
             appendFooter(builder, targetName, category, page, totalPages);
             sender.sendMessage(builder.build());
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.LIST_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.LIST_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }
@@ -194,11 +194,11 @@ public record ListCommand(
             return;
         }
         builder.appendNewline()
-                .append(parseMiniMessage(MessageKeys.LIST_CATEGORY, "<label>", label));
+                .append(parseMiniMessage(MessageKeys.LIST_CATEGORY, "label", label));
         for (RealtyRegionEntity region : regions) {
             builder.appendNewline()
                     .append(parseMiniMessage(MessageKeys.LIST_ENTRY,
-                            "<region>",
+                            "region",
                             region.worldGuardRegionId()));
         }
     }
@@ -214,7 +214,7 @@ public record ListCommand(
             return;
         }
         builder.appendNewline()
-                .append(parseMiniMessage(MessageKeys.LIST_CATEGORY, "<label>", label));
+                .append(parseMiniMessage(MessageKeys.LIST_CATEGORY, "label", label));
         for (RealtyRegionEntity region : regions) {
             LeaseholdContractEntity leasehold = api.getLeaseholdContract(
                     region.worldGuardRegionId(), region.worldId()).join();
@@ -222,8 +222,8 @@ public record ListCommand(
             builder.appendNewline()
                     .append(parseMiniMessage(
                             MessageKeys.LIST_RENTED_ENTRY,
-                            "<region>", region.worldGuardRegionId(),
-                            "<time_left>", timeLeft
+                            "region", region.worldGuardRegionId(),
+                            "time_left", timeLeft
                     ));
         }
     }
@@ -237,11 +237,11 @@ public record ListCommand(
                 ? buildNavComponent(MessageKeys.LIST_NEXT, targetName, category, page + 1)
                 : Component.empty();
         builder.appendNewline()
-                .append(messages.messageFor(MessageKeys.LIST_FOOTER,
-                        Placeholder.unparsed("page", String.valueOf(page)),
-                        Placeholder.unparsed("total", String.valueOf(totalPages)),
-                        Placeholder.component("previous", previousComponent),
-                        Placeholder.component("next", nextComponent)));
+                .append(messages.component(MessageKeys.LIST_FOOTER,
+                        "page", String.valueOf(page),
+                        "total", String.valueOf(totalPages),
+                        "previous", previousComponent,
+                        "next", nextComponent));
     }
 
     private @NotNull Component buildNavComponent(@NotNull String key, @NotNull String playerName,
@@ -253,16 +253,25 @@ public record ListCommand(
         command.append(" --page ").append(targetPage);
         command.append(" --player ").append(playerName);
         return parseMiniMessage(key,
-                "<command>", command.toString());
+                "command", command.toString());
     }
 
+    /**
+     * Renders a message whose placeholders sit inside a MiniMessage tag argument — the click
+     * targets on the pagination links and result rows.
+     *
+     * <p>{@code Message.component} rewrites each placeholder into a generated MiniMessage tag and
+     * lets a resolver fill it, which cannot reach inside another tag's argument. {@code format}
+     * substitutes textually into the pattern first, so the finished string is deserialized here
+     * with the click target already in place.</p>
+     *
+     * <p>Values passed this way are interpolated as markup rather than escaped, so they must be
+     * plugin-authored: region ids, formatted prices and commands this class builds, never
+     * player-supplied text.</p>
+     */
     private @NotNull Component parseMiniMessage(@NotNull String key,
-                                                @NotNull String... replacements) {
-        String raw = messages.miniMessageFormattedFor(key);
-        for (int i = 0; i < replacements.length; i += 2) {
-            raw = raw.replace(replacements[i], replacements[i + 1]);
-        }
-        return messages.deserializeRaw(raw);
+                                                @NotNull Object... replacements) {
+        return MiniMessage.miniMessage().deserialize(messages.format(key, replacements));
     }
 
 }

@@ -4,10 +4,9 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.GroupPrefix;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import org.incendo.cloud.paper.util.sender.Source;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -28,7 +27,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>Base permission: {@code realty.command.remove}.
  * Acting on another player's region additionally requires {@code realty.command.remove.others}.</p>
  */
-public record RemoveCommand(@NotNull MessageContainer messages) implements CustomCommandBean.Single {
+public record RemoveCommand(@NotNull Message messages) implements CustomCommandBean.Single {
 
     @Override
     public @NotNull Command<? extends Source> command(@NotNull Command.Builder<Source> builder) {
@@ -57,7 +56,7 @@ public record RemoveCommand(@NotNull MessageContainer messages) implements Custo
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -65,7 +64,7 @@ public record RemoveCommand(@NotNull MessageContainer messages) implements Custo
         if (sender instanceof Player player
                 && !sender.hasPermission("realty.command.remove.others")
                 && !region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.REMOVE_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.REMOVE_NO_PERMISSION));
             return;
         }
         ProtectedRegion protectedRegion = region.region();
@@ -76,9 +75,9 @@ public record RemoveCommand(@NotNull MessageContainer messages) implements Custo
             OfflinePlayer target = Bukkit.getOfflinePlayer(playerOrGroup);
             protectedRegion.getMembers().removePlayer(target.getUniqueId());
         }
-        sender.sendMessage(messages.messageFor(MessageKeys.REMOVE_SUCCESS,
-                Placeholder.unparsed("target", playerOrGroup),
-                Placeholder.unparsed("region", regionId)));
+        sender.sendMessage(messages.component(MessageKeys.REMOVE_SUCCESS,
+                "target", playerOrGroup,
+                "region", regionId));
     }
 
 }

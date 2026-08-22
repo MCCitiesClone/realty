@@ -7,9 +7,8 @@ import io.github.md5sha256.realty.api.event.LeaseExtendEvent;
 import io.github.md5sha256.realty.api.event.LeaseExtendedEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.incendo.cloud.paper.util.sender.Source;
 
 import org.bukkit.entity.Player;
@@ -24,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public record ExtendCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events
 ) implements CustomCommandBean.Single {
 
@@ -40,51 +39,51 @@ public record ExtendCommand(
 
     private void execute(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         // Cancellable pre-event (main thread); a veto stops the action before the API is called.
         if (!events.fireSync(new LeaseExtendEvent(region, sender.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.extend(region, sender.getUniqueId()).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.ExtendResult.Success success -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_SUCCESS,
-                            Placeholder.unparsed("region", success.regionId()),
-                            Placeholder.unparsed("price", CurrencyFormatter.format(success.price()))));
+                    sender.sendMessage(messages.component(MessageKeys.EXTEND_SUCCESS,
+                            "region", success.regionId(),
+                            "price", CurrencyFormatter.format(success.price())));
                     // Post-event; fireSync hops to the main thread. Available for external listeners.
                     events.fireSync(new LeaseExtendedEvent(region, sender.getUniqueId(), success.price()));
                 }
                 case RealtyPaperApi.ExtendResult.NoLeaseholdContract noContract ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", noContract.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_NO_LEASEHOLD_CONTRACT,
+                                "region", noContract.regionId()));
                 case RealtyPaperApi.ExtendResult.NoExtensionsRemaining noExtensions ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_NO_EXTENSIONS,
-                                Placeholder.unparsed("region", noExtensions.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_NO_EXTENSIONS,
+                                "region", noExtensions.regionId()));
                 case RealtyPaperApi.ExtendResult.Terminating terminating ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_TERMINATING,
-                                Placeholder.unparsed("region", terminating.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_TERMINATING,
+                                "region", terminating.regionId()));
                 case RealtyPaperApi.ExtendResult.InsufficientFunds insufficient ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_INSUFFICIENT_FUNDS,
-                                Placeholder.unparsed("price", CurrencyFormatter.format(insufficient.price())),
-                                Placeholder.unparsed("balance", CurrencyFormatter.format(insufficient.balance()))));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_INSUFFICIENT_FUNDS,
+                                "price", CurrencyFormatter.format(insufficient.price()),
+                                "balance", CurrencyFormatter.format(insufficient.balance())));
                 case RealtyPaperApi.ExtendResult.PaymentFailed failed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_PAYMENT_FAILED,
-                                Placeholder.unparsed("error", failed.error())));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_PAYMENT_FAILED,
+                                "error", failed.error()));
                 case RealtyPaperApi.ExtendResult.UpdateFailed updateFailed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_UPDATE_FAILED,
-                                Placeholder.unparsed("region", updateFailed.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_UPDATE_FAILED,
+                                "region", updateFailed.regionId()));
                 case RealtyPaperApi.ExtendResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.EXTEND_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.EXTEND_ERROR,
+                                "error", error.message()));
             }
         });
     }

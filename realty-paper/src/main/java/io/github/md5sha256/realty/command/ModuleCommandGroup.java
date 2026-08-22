@@ -4,9 +4,8 @@ import com.minecraftcitiesnetwork.pluginInfrastructure.modules.LoadedModule;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
 import io.github.md5sha256.realty.Realty;
 import io.github.md5sha256.realty.api.ExecutorState;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -32,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
 public record ModuleCommandGroup(
         @NotNull ModuleLifecycleManager<Realty> moduleManager,
         @NotNull ExecutorState executorState,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     @Override
@@ -71,17 +70,16 @@ public record ModuleCommandGroup(
         executorState.mainThreadExec().execute(() -> {
             Map<String, LoadedModule<Realty>> active = moduleManager.getActiveModules();
             if (active.isEmpty()) {
-                sender.sendMessage(messages.messageFor(MessageKeys.MODULE_LIST_EMPTY));
+                sender.sendMessage(messages.component(MessageKeys.MODULE_LIST_EMPTY));
                 return;
             }
-            sender.sendMessage(messages.messageFor(MessageKeys.MODULE_LIST_HEADER,
-                    Placeholder.unparsed("count", String.valueOf(active.size()))));
+            sender.sendMessage(messages.component(MessageKeys.MODULE_LIST_HEADER,
+                    "count", String.valueOf(active.size())));
             for (LoadedModule<Realty> module : active.values()) {
-                sender.sendMessage(messages.messageFor(MessageKeys.MODULE_LIST_ENTRY,
-                        Placeholder.unparsed("module", module.manifest().moduleName()),
-                        Placeholder.unparsed("author", module.manifest().author()),
-                        Placeholder.unparsed("reloadable",
-                                String.valueOf(module.manifest().reloadable()))));
+                sender.sendMessage(messages.component(MessageKeys.MODULE_LIST_ENTRY,
+                        "module", module.manifest().moduleName(),
+                        "author", module.manifest().author(),
+                        "reloadable", String.valueOf(module.manifest().reloadable())));
             }
         });
     }
@@ -92,14 +90,14 @@ public record ModuleCommandGroup(
         executorState.mainThreadExec().execute(() ->
                 moduleManager.reloadAsync(moduleName).whenComplete((ignored, error) -> {
                     if (error == null) {
-                        sender.sendMessage(messages.messageFor(MessageKeys.MODULE_RELOAD_SUCCESS,
-                                Placeholder.unparsed("module", moduleName)));
+                        sender.sendMessage(messages.component(MessageKeys.MODULE_RELOAD_SUCCESS,
+                                "module", moduleName));
                         return;
                     }
                     Throwable cause = error.getCause() != null ? error.getCause() : error;
-                    sender.sendMessage(messages.messageFor(MessageKeys.MODULE_RELOAD_ERROR,
-                            Placeholder.unparsed("module", moduleName),
-                            Placeholder.unparsed("error", describe(cause))));
+                    sender.sendMessage(messages.component(MessageKeys.MODULE_RELOAD_ERROR,
+                            "module", moduleName,
+                            "error", describe(cause)));
                 }));
     }
 

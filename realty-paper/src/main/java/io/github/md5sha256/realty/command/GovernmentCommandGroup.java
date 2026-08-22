@@ -1,11 +1,10 @@
 package io.github.md5sha256.realty.command;
 
 import io.github.md5sha256.realty.database.entity.GovernmentPartyEntity;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.api.ExecutorState;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -35,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 public record GovernmentCommandGroup(
         @NotNull PartyService parties,
         @NotNull ExecutorState executorState,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     @Override
@@ -68,7 +67,7 @@ public record GovernmentCommandGroup(
         CommandSender sender = ctx.sender().source();
         String account = ctx.get("account");
         if (!parties.treasuryAvailable()) {
-            sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_NO_TREASURY));
+            sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_NO_TREASURY));
             return;
         }
         // Treasury lookup plus a database write: kept off the main thread.
@@ -76,17 +75,17 @@ public record GovernmentCommandGroup(
                 .supplyAsync(() -> parties.registerByName(account), executorState.dbExec())
                 .thenAcceptAsync(party -> {
                     if (party.isEmpty()) {
-                        sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_NOT_FOUND,
-                                Placeholder.unparsed("account", account)));
+                        sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_NOT_FOUND,
+                                "account", account));
                         return;
                     }
-                    sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_REGISTERED,
-                            Placeholder.unparsed("account", party.get().displayName())));
+                    sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_REGISTERED,
+                            "account", party.get().displayName()));
                 }, executorState.mainThreadExec())
                 .exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
@@ -95,18 +94,18 @@ public record GovernmentCommandGroup(
         CommandSender sender = ctx.sender().source();
         List<GovernmentPartyEntity> registered = parties.parties();
         if (registered.isEmpty()) {
-            sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_LIST_EMPTY));
+            sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_LIST_EMPTY));
             return;
         }
-        sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_LIST_HEADER,
-                Placeholder.unparsed("count", String.valueOf(registered.size()))));
+        sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_LIST_HEADER,
+                "count", String.valueOf(registered.size())));
         for (GovernmentPartyEntity party : registered) {
             // The party UUID is shown because it is what the default-*-authority-uuid settings
             // take: a server whose plots default to a government needs to paste it in there.
-            sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_LIST_ENTRY,
-                    Placeholder.unparsed("account", party.displayName()),
-                    Placeholder.unparsed("account_id", String.valueOf(party.accountId())),
-                    Placeholder.unparsed("uuid", party.partyUuid().toString())));
+            sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_LIST_ENTRY,
+                    "account", party.displayName(),
+                    "account_id", String.valueOf(party.accountId()),
+                    "uuid", party.partyUuid().toString()));
         }
     }
 
@@ -115,22 +114,22 @@ public record GovernmentCommandGroup(
         String name = ctx.get("name");
         var party = parties.partyByName(name);
         if (party.isEmpty()) {
-            sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_NOT_REGISTERED,
-                    Placeholder.unparsed("account", name)));
+            sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_NOT_REGISTERED,
+                    "account", name));
             return;
         }
         CompletableFuture
                 .supplyAsync(() -> parties.unregister(party.get().partyUuid()), executorState.dbExec())
                 .thenAcceptAsync(removed -> sender.sendMessage(removed
-                                ? messages.messageFor(MessageKeys.GOVERNMENT_UNREGISTERED,
-                                        Placeholder.unparsed("account", party.get().displayName()))
-                                : messages.messageFor(MessageKeys.GOVERNMENT_NOT_REGISTERED,
-                                        Placeholder.unparsed("account", name))),
+                                ? messages.component(MessageKeys.GOVERNMENT_UNREGISTERED,
+                                        "account", party.get().displayName())
+                                : messages.component(MessageKeys.GOVERNMENT_NOT_REGISTERED,
+                                        "account", name)),
                         executorState.mainThreadExec())
                 .exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    sender.sendMessage(messages.messageFor(MessageKeys.GOVERNMENT_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.GOVERNMENT_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }

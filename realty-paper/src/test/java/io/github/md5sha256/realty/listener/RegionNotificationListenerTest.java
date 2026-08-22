@@ -6,7 +6,7 @@ import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.api.event.LeaseExpiredEvent;
 import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.party.PartyService;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -56,10 +56,8 @@ class RegionNotificationListenerTest {
     void setUp() {
         events = mock(RealtyEventDispatch.class);
         parties = mock(PartyService.class);
-        MessageContainer messages = mock(MessageContainer.class);
-        lenient().when(messages.messageFor(any(), any(), any())).thenReturn(Component.empty());
-        lenient().when(messages.messageFor(any(), any())).thenReturn(Component.empty());
-        lenient().when(messages.messageFor(any())).thenReturn(Component.empty());
+        Message messages = mock(Message.class);
+        lenient().when(messages.component(any(), any(Object[].class))).thenReturn(Component.empty());
         // Names are rendered through Bukkit for player parties; no server exists here.
         bukkit = Mockito.mockStatic(Bukkit.class);
         bukkit.when(() -> Bukkit.getPlayer(any(UUID.class))).thenReturn(null);

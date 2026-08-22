@@ -9,9 +9,8 @@ import io.github.md5sha256.realty.api.event.LeaseTerminationCancelledEvent;
 import io.github.md5sha256.realty.api.event.LeaseTerminationScheduledEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -35,7 +34,7 @@ import java.util.List;
  */
 public record TerminateCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events
 ) implements CustomCommandBean {
 
@@ -61,23 +60,23 @@ public record TerminateCommand(
 
     private void executeTerminate(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         boolean immediate = ctx.flags().hasFlag(NOW_FLAG);
         if (immediate && !sender.hasPermission("realty.command.terminate.now")) {
-            sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_NOW_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.TERMINATE_NOW_NO_PERMISSION));
             return;
         }
         // Cancellable pre-event (main thread); a veto stops the action before the API is called.
         if (!events.fireSync(new LeaseTerminateEvent(region, sender.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         boolean bypass = sender.hasPermission("realty.command.terminate.others");
@@ -87,57 +86,57 @@ public record TerminateCommand(
                 case RealtyPaperApi.TerminateResult.Success success -> {
                     String date = success.effectiveDate().format(DateTimeFormatters.DATE_TIME);
                     if (success.charged() > 0) {
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_SUCCESS_CHARGED,
-                                Placeholder.unparsed("region", success.regionId()),
-                                Placeholder.unparsed("date", date),
-                                Placeholder.unparsed("charged", CurrencyFormatter.format(success.charged()))));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_SUCCESS_CHARGED,
+                                "region", success.regionId(),
+                                "date", date,
+                                "charged", CurrencyFormatter.format(success.charged())));
                     } else {
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_SUCCESS,
-                                Placeholder.unparsed("region", success.regionId()),
-                                Placeholder.unparsed("date", date)));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_SUCCESS,
+                                "region", success.regionId(),
+                                "date", date));
                     }
                     events.fireSync(new LeaseTerminationScheduledEvent(region, success.landlordId(),
                             success.tenantId(), success.terminatedByRole(), success.effectiveDate(),
                             success.charged()));
                 }
                 case RealtyPaperApi.TerminateResult.NoLeaseholdContract ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_NO_LEASEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_NO_LEASEHOLD_CONTRACT,
+                                "region", regionId));
                 case RealtyPaperApi.TerminateResult.NotOccupied ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_NOT_OCCUPIED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_NOT_OCCUPIED,
+                                "region", regionId));
                 case RealtyPaperApi.TerminateResult.AlreadyTerminating ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_ALREADY_TERMINATING,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_ALREADY_TERMINATING,
+                                "region", regionId));
                 case RealtyPaperApi.TerminateResult.NotAuthorized ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_NOT_AUTHORIZED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_NOT_AUTHORIZED,
+                                "region", regionId));
                 case RealtyPaperApi.TerminateResult.InsufficientFunds funds ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_INSUFFICIENT_FUNDS,
-                                Placeholder.unparsed("price", CurrencyFormatter.format(funds.price())),
-                                Placeholder.unparsed("balance", CurrencyFormatter.format(funds.balance()))));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_INSUFFICIENT_FUNDS,
+                                "price", CurrencyFormatter.format(funds.price()),
+                                "balance", CurrencyFormatter.format(funds.balance())));
                 case RealtyPaperApi.TerminateResult.PaymentFailed failed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_PAYMENT_FAILED,
-                                Placeholder.unparsed("error", failed.error())));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_PAYMENT_FAILED,
+                                "error", failed.error()));
                 case RealtyPaperApi.TerminateResult.UpdateFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_UPDATE_FAILED,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_UPDATE_FAILED,
+                                "region", regionId));
                 case RealtyPaperApi.TerminateResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.TERMINATE_ERROR,
+                                "error", error.message()));
             }
         });
     }
 
     private void executeCancel(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         boolean bypass = sender.hasPermission("realty.command.terminate.others");
@@ -146,27 +145,27 @@ public record TerminateCommand(
                 .thenAccept(result -> {
                     switch (result) {
                         case io.github.md5sha256.realty.api.RealtyBackend.CancelTerminationResult.Success success -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_CANCEL_SUCCESS,
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.TERMINATE_CANCEL_SUCCESS,
+                                    "region", regionId));
                             events.fireSync(new LeaseTerminationCancelledEvent(region, success.landlordId(),
                                     success.tenantId(), success.terminatedByRole()));
                         }
                         case io.github.md5sha256.realty.api.RealtyBackend.CancelTerminationResult.NoLeaseholdContract ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_CANCEL_NO_LEASEHOLD_CONTRACT,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TERMINATE_CANCEL_NO_LEASEHOLD_CONTRACT,
+                                        "region", regionId));
                         case io.github.md5sha256.realty.api.RealtyBackend.CancelTerminationResult.NotTerminating ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_CANCEL_NOT_TERMINATING,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TERMINATE_CANCEL_NOT_TERMINATING,
+                                        "region", regionId));
                         case io.github.md5sha256.realty.api.RealtyBackend.CancelTerminationResult.NotAuthorized ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_CANCEL_NOT_AUTHORIZED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TERMINATE_CANCEL_NOT_AUTHORIZED,
+                                        "region", regionId));
                         case io.github.md5sha256.realty.api.RealtyBackend.CancelTerminationResult.UpdateFailed ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_CANCEL_UPDATE_FAILED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TERMINATE_CANCEL_UPDATE_FAILED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TERMINATE_CANCEL_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(ex.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.TERMINATE_CANCEL_ERROR,
+                            "error", String.valueOf(ex.getMessage())));
                     return null;
                 });
     }

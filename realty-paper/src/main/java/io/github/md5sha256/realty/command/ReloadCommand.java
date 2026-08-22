@@ -1,9 +1,8 @@
 package io.github.md5sha256.realty.command;
 
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.api.ExecutorState;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.incendo.cloud.paper.util.sender.Source;
 import org.bukkit.command.CommandSender;
 import org.incendo.cloud.Command;
@@ -21,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 public record ReloadCommand(
         @NotNull ExecutorState executorState,
         @NotNull Callable<Void> reloadTask,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean.Single {
 
     @Override
@@ -39,11 +38,11 @@ public record ReloadCommand(
             try {
                 reloadTask.call();
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.RELOAD_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.RELOAD_ERROR,
+                        "error", ex.getMessage()));
                 return;
             }
-            sender.sendMessage(messages.messageFor(MessageKeys.RELOAD_SUCCESS));
+            sender.sendMessage(messages.component(MessageKeys.RELOAD_SUCCESS));
         }, executorState.dbExec());
     }
 

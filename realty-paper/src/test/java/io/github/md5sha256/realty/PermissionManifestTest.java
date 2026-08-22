@@ -3,8 +3,8 @@ package io.github.md5sha256.realty;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.spongepowered.configurate.ConfigurationNode;
-import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -64,13 +64,26 @@ class PermissionManifestTest {
         try (InputStream stream = PermissionManifestTest.class
                 .getResourceAsStream("/paper-plugin.yml")) {
             Assertions.assertNotNull(stream, "paper-plugin.yml is missing from the jar");
-            ConfigurationNode root = YamlConfigurationLoader.builder()
-                    .source(() -> new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8)))
-                    .build()
-                    .load();
+            YamlConfiguration root;
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                root = YamlConfiguration.loadConfiguration(reader);
+            }
             Set<String> declared = new TreeSet<>();
-            root.node("permissions").childrenMap().keySet()
-                    .forEach(key -> declared.add(key.toString()));
+            ConfigurationSection permissions = root.getConfigurationSection("permissions");
+            if (permissions == null) {
+                return declared;
+            }
+            // Bukkit treats '.' as a path separator, so "realty.command.buy:" parses as a tree and
+            // the literal key is never a direct child. Walk every path and keep the ones that
+            // actually describe a permission — the intermediates ("realty", "realty.command") are
+            // artefacts of that split, not declared nodes.
+            for (String path : permissions.getKeys(true)) {
+                ConfigurationSection node = permissions.getConfigurationSection(path);
+                if (node != null && (node.contains("default") || node.contains("description"))) {
+                    declared.add(path);
+                }
+            }
             return declared;
         }
     }

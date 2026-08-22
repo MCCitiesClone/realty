@@ -6,9 +6,8 @@ import io.github.md5sha256.realty.api.event.RegionDeleteEvent;
 import io.github.md5sha256.realty.api.event.RegionDeletedEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionParser;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -26,7 +25,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public record DeleteCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events
 ) implements CustomCommandBean.Single {
 
@@ -48,31 +47,31 @@ public record DeleteCommand(
         CommandSender sender = ctx.sender().source();
 
         if (includeWorldGuard && !sender.hasPermission("realty.command.delete.includeworldguard")) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_NO_PERMISSION));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_NO_PERMISSION));
             return;
         }
 
         if (sender instanceof Player player
                 && !events.fireSync(new RegionDeleteEvent(region, player.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.deleteRegion(region, includeWorldGuard).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.DeleteResult.Success ignored -> {
-                        sender.sendMessage(messages.messageFor(MessageKeys.DELETE_SUCCESS));
+                        sender.sendMessage(messages.component(MessageKeys.DELETE_SUCCESS));
                         if (sender instanceof Player player) {
                             events.fireSync(new RegionDeletedEvent(region, player.getUniqueId()));
                         }
                 }
                 case RealtyPaperApi.DeleteResult.NotRegistered ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.DELETE_NOT_REGISTERED));
+                        sender.sendMessage(messages.component(MessageKeys.DELETE_NOT_REGISTERED));
                 case RealtyPaperApi.DeleteResult.WorldGuardSaveError wgError ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.DELETE_WORLDGUARD_SAVE_ERROR,
-                                Placeholder.unparsed("error", wgError.error())));
+                        sender.sendMessage(messages.component(MessageKeys.DELETE_WORLDGUARD_SAVE_ERROR,
+                                "error", wgError.error()));
                 case RealtyPaperApi.DeleteResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.DELETE_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.DELETE_ERROR,
+                                "error", error.message()));
             }
         });
     }

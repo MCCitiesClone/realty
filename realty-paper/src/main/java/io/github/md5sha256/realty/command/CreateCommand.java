@@ -23,10 +23,9 @@ import io.github.md5sha256.realty.command.util.DurationParser;
 import io.github.md5sha256.realty.command.util.ParseBounds;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -56,7 +55,7 @@ import java.util.regex.Pattern;
  */
 public record CreateCommand(@NotNull RealtyPaperApi api,
                              @NotNull AtomicReference<Settings> settings,
-                             @NotNull MessageContainer messages,
+                             @NotNull Message messages,
                              @NotNull RealtyEventDispatch events,
                              @NotNull PartyService parties) implements CustomCommandBean {
 
@@ -112,13 +111,13 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
 
     private void executeLeasehold(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player player)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         String name = ctx.get(NAME);
         if (!VALID_NAME_PATTERN.matcher(name).matches()) {
-            player.sendMessage(messages.messageFor(MessageKeys.CREATE_INVALID_NAME,
-                    Placeholder.unparsed("region", name)));
+            player.sendMessage(messages.component(MessageKeys.CREATE_INVALID_NAME,
+                    "region", name));
             return;
         }
         double price = ctx.get(PRICE);
@@ -129,18 +128,18 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
 
         RegionManager regionManager = getRegionManager(player.getWorld());
         if (regionManager == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.COMMON_ERROR,
-                    Placeholder.unparsed("error", "Region manager unavailable")));
+            player.sendMessage(messages.component(MessageKeys.COMMON_ERROR,
+                    "error", "Region manager unavailable"));
             return;
         }
         if (regionManager.getRegion(name) != null) {
-            player.sendMessage(messages.messageFor(MessageKeys.CREATE_REGION_EXISTS,
-                    Placeholder.unparsed("region", name)));
+            player.sendMessage(messages.component(MessageKeys.CREATE_REGION_EXISTS,
+                    "region", name));
             return;
         }
         Region selection = getSelection(player);
         if (selection == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.CREATE_INCOMPLETE_SELECTION));
+            player.sendMessage(messages.component(MessageKeys.CREATE_INCOMPLETE_SELECTION));
             return;
         }
 
@@ -148,7 +147,7 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
         World world = player.getWorld();
         WorldGuardRegion region = new WorldGuardRegion(wgRegion, world);
         if (!events.fireSync(new RegionCreateEvent(region, player.getUniqueId()))) {
-            player.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            player.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         regionManager.addRegion(wgRegion);
@@ -157,37 +156,37 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyPaperApi.CreateLeaseholdResult.Success ignored -> {
-                                player.sendMessage(messages.messageFor(MessageKeys.CREATE_LEASEHOLD_SUCCESS,
-                                        Placeholder.unparsed("region", name)));
+                                player.sendMessage(messages.component(MessageKeys.CREATE_LEASEHOLD_SUCCESS,
+                                        "region", name));
                                 events.fireSync(new RegionCreatedEvent(region, player.getUniqueId()));
                         }
                         case RealtyPaperApi.CreateLeaseholdResult.AlreadyRegistered ignored -> {
                             regionManager.removeRegion(name);
-                            player.sendMessage(messages.messageFor(MessageKeys.CREATE_ALREADY_REGISTERED,
-                                    Placeholder.unparsed("region", name)));
+                            player.sendMessage(messages.component(MessageKeys.CREATE_ALREADY_REGISTERED,
+                                    "region", name));
                         }
                         case RealtyPaperApi.CreateLeaseholdResult.Error error ->
-                                player.sendMessage(messages.messageFor(MessageKeys.CREATE_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                player.sendMessage(messages.component(MessageKeys.CREATE_ERROR,
+                                        "error", error.message()));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    player.sendMessage(messages.messageFor(MessageKeys.CREATE_ERROR,
-                            Placeholder.unparsed("error", cause.getMessage())));
+                    player.sendMessage(messages.component(MessageKeys.CREATE_ERROR,
+                            "error", cause.getMessage()));
                     return null;
                 });
     }
 
     private void executeFreehold(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player player)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         String name = ctx.get(NAME);
         if (!VALID_NAME_PATTERN.matcher(name).matches()) {
-            player.sendMessage(messages.messageFor(MessageKeys.CREATE_INVALID_NAME,
-                    Placeholder.unparsed("region", name)));
+            player.sendMessage(messages.component(MessageKeys.CREATE_INVALID_NAME,
+                    "region", name));
             return;
         }
         Double price = ctx.flags().getValue(PRICE_FLAG, null);
@@ -198,18 +197,18 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
 
         RegionManager regionManager = getRegionManager(player.getWorld());
         if (regionManager == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.COMMON_ERROR,
-                    Placeholder.unparsed("error", "Region manager unavailable")));
+            player.sendMessage(messages.component(MessageKeys.COMMON_ERROR,
+                    "error", "Region manager unavailable"));
             return;
         }
         if (regionManager.getRegion(name) != null) {
-            player.sendMessage(messages.messageFor(MessageKeys.CREATE_REGION_EXISTS,
-                    Placeholder.unparsed("region", name)));
+            player.sendMessage(messages.component(MessageKeys.CREATE_REGION_EXISTS,
+                    "region", name));
             return;
         }
         Region selection = getSelection(player);
         if (selection == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.CREATE_INCOMPLETE_SELECTION));
+            player.sendMessage(messages.component(MessageKeys.CREATE_INCOMPLETE_SELECTION));
             return;
         }
 
@@ -217,7 +216,7 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
         World world = player.getWorld();
         WorldGuardRegion region = new WorldGuardRegion(wgRegion, world);
         if (!events.fireSync(new RegionCreateEvent(region, player.getUniqueId()))) {
-            player.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            player.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         regionManager.addRegion(wgRegion);
@@ -226,24 +225,24 @@ public record CreateCommand(@NotNull RealtyPaperApi api,
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyPaperApi.CreateFreeholdResult.Success ignored -> {
-                                player.sendMessage(messages.messageFor(MessageKeys.CREATE_FREEHOLD_SUCCESS,
-                                        Placeholder.unparsed("region", name)));
+                                player.sendMessage(messages.component(MessageKeys.CREATE_FREEHOLD_SUCCESS,
+                                        "region", name));
                                 events.fireSync(new RegionCreatedEvent(region, player.getUniqueId()));
                         }
                         case RealtyPaperApi.CreateFreeholdResult.AlreadyRegistered ignored -> {
                             regionManager.removeRegion(name);
-                            player.sendMessage(messages.messageFor(MessageKeys.CREATE_ALREADY_REGISTERED,
-                                    Placeholder.unparsed("region", name)));
+                            player.sendMessage(messages.component(MessageKeys.CREATE_ALREADY_REGISTERED,
+                                    "region", name));
                         }
                         case RealtyPaperApi.CreateFreeholdResult.Error error ->
-                                player.sendMessage(messages.messageFor(MessageKeys.CREATE_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                player.sendMessage(messages.component(MessageKeys.CREATE_ERROR,
+                                        "error", error.message()));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    player.sendMessage(messages.messageFor(MessageKeys.CREATE_ERROR,
-                            Placeholder.unparsed("error", cause.getMessage())));
+                    player.sendMessage(messages.component(MessageKeys.CREATE_ERROR,
+                            "error", cause.getMessage()));
                     return null;
                 });
     }

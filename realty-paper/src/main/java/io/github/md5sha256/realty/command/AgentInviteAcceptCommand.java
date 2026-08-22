@@ -7,10 +7,9 @@ import io.github.md5sha256.realty.api.event.AgentInviteAcceptedEvent;
 import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import org.incendo.cloud.paper.util.sender.Source;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -28,7 +27,7 @@ import java.util.UUID;
  * <p>Permission: {@code realty.command.agent.invite.accept}.</p>
  */
 public record AgentInviteAcceptCommand(@NotNull RealtyPaperApi api,
-                                        @NotNull MessageContainer messages,
+                                        @NotNull Message messages,
                                         @NotNull RealtyEventDispatch events) implements CustomCommandBean.Single {
 
     @Override
@@ -46,13 +45,13 @@ public record AgentInviteAcceptCommand(@NotNull RealtyPaperApi api,
     private void execute(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(player.getLocation()));
         if (region == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            player.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -61,24 +60,24 @@ public record AgentInviteAcceptCommand(@NotNull RealtyPaperApi api,
         api.acceptAgentInvite(regionId, worldId, inviteeId).thenAccept(result -> {
             switch (result) {
                 case RealtyBackend.AcceptAgentInviteResult.Success(UUID inviterId) -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_ACCEPT_SUCCESS,
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_ACCEPT_SUCCESS,
+                            "region", regionId));
                     events.fireSync(new RealtyNotificationEvent(List.of(inviterId),
-                            messages.messageFor(MessageKeys.NOTIFICATION_AGENT_INVITE_ACCEPTED,
-                                    Placeholder.unparsed("player", player.getName()),
-                                    Placeholder.unparsed("region", regionId)), region));
+                            messages.component(MessageKeys.NOTIFICATION_AGENT_INVITE_ACCEPTED,
+                                    "player", player.getName(),
+                                    "region", regionId), region));
                     events.fireSync(new AgentInviteAcceptedEvent(region, inviteeId));
                 }
                 case RealtyBackend.AcceptAgentInviteResult.NotFound() ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_ACCEPT_NOT_FOUND,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_ACCEPT_NOT_FOUND,
+                                "region", regionId));
                 case RealtyBackend.AcceptAgentInviteResult.AlreadyAgent() ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_ACCEPT_ALREADY_AGENT,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_ACCEPT_ALREADY_AGENT,
+                                "region", regionId));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.AGENT_INVITE_ACCEPT_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.AGENT_INVITE_ACCEPT_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }

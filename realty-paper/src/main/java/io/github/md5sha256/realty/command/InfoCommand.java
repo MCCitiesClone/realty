@@ -13,14 +13,13 @@ import io.github.md5sha256.realty.database.entity.FreeholdContractEntity;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
 import io.github.md5sha256.realty.party.PartyNames;
 import io.github.md5sha256.realty.party.PartyService;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.RealtyTags;
 import io.github.md5sha256.realty.settings.Settings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -48,7 +47,7 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
                           @NotNull AtomicReference<Settings> settings,
                           @NotNull Database database,
                           @NotNull AtomicReference<RealtyTags> realtyTags,
-                          @NotNull MessageContainer messages,
+                          @NotNull Message messages,
                           @NotNull PartyService parties) implements CustomCommandBean.Single {
 
     private static @NotNull String resolveMembers(@NotNull WorldGuardRegion region) {
@@ -96,7 +95,7 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -106,8 +105,8 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
 
         api.getRegionInfo(regionId, worldId).thenAccept(info -> {
             TextComponent.Builder builder = Component.text();
-            builder.append(messages.messageFor(MessageKeys.INFO_HEADER,
-                    Placeholder.unparsed("region", regionId)));
+            builder.append(messages.component(MessageKeys.INFO_HEADER,
+                    "region", regionId));
 
             FreeholdContractEntity freehold = info.freehold();
             LeaseholdContractEntity leasehold = info.leasehold();
@@ -115,7 +114,7 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
 
             if (freehold == null && leasehold == null && !hasAuction) {
                 builder.appendNewline()
-                        .append(messages.messageFor(MessageKeys.INFO_NO_CONTRACTS));
+                        .append(messages.component(MessageKeys.INFO_NO_CONTRACTS));
                 sender.sendMessage(builder.build());
                 return;
             }
@@ -123,8 +122,8 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
             if (freehold != null) {
                 appendFreeholdInfo(builder, freehold, info.lastSoldPrice(), membersStr);
                 builder.appendNewline()
-                        .append(messages.messageFor(MessageKeys.INFO_AUCTION_ACTIVE,
-                                Placeholder.unparsed("has_auction", hasAuction ? "Yes" : "No")));
+                        .append(messages.component(MessageKeys.INFO_AUCTION_ACTIVE,
+                                "has_auction", hasAuction ? "Yes" : "No"));
             }
 
             if (leasehold != null) {
@@ -135,15 +134,15 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
                 List<String> tags = session.regionTagMapper().selectTagIdsByRegionId(regionId);
                 Component tagsComponent = buildTagsComponent(tags);
                 builder.appendNewline()
-                        .append(messages.messageFor(MessageKeys.INFO_TAGS,
-                                Placeholder.component("tags", tagsComponent)));
+                        .append(messages.component(MessageKeys.INFO_TAGS,
+                                "tags", tagsComponent));
             }
 
             sender.sendMessage(builder.build());
         }).exceptionally(ex -> {
             ex.printStackTrace();
-            sender.sendMessage(messages.messageFor(MessageKeys.INFO_ERROR,
-                    Placeholder.unparsed("error", String.valueOf(ex.getMessage()))));
+            sender.sendMessage(messages.component(MessageKeys.INFO_ERROR,
+                    "error", String.valueOf(ex.getMessage())));
             return null;
         });
     }
@@ -157,18 +156,18 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
 
         if (freehold.price() != null) {
             builder.appendNewline()
-                    .append(messages.messageFor(MessageKeys.INFO_FOR_SALE,
-                            Placeholder.unparsed("title_holder", titleHolder),
-                            Placeholder.unparsed("authority", authority),
-                            Placeholder.unparsed("price", CurrencyFormatter.format(freehold.price()))));
+                    .append(messages.component(MessageKeys.INFO_FOR_SALE,
+                            "title_holder", titleHolder,
+                            "authority", authority,
+                            "price", CurrencyFormatter.format(freehold.price())));
         } else {
             String lastSold = lastSoldPrice != null ? CurrencyFormatter.format(lastSoldPrice) : "N/A";
             builder.appendNewline()
-                    .append(messages.messageFor(MessageKeys.INFO_SOLD,
-                            Placeholder.unparsed("title_holder", titleHolder),
-                            Placeholder.unparsed("members", membersStr),
-                            Placeholder.unparsed("authority", authority),
-                            Placeholder.unparsed("last_sold_price", lastSold)));
+                    .append(messages.component(MessageKeys.INFO_SOLD,
+                            "title_holder", titleHolder,
+                            "members", membersStr,
+                            "authority", authority,
+                            "last_sold_price", lastSold));
         }
     }
 
@@ -201,21 +200,20 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
         }
 
         builder.appendNewline()
-                .append(messages.messageFor(MessageKeys.INFO_LEASEHOLD,
-                        Placeholder.unparsed("landlord", resolveName(leasehold.landlordId())),
-                        Placeholder.unparsed("members", membersStr),
-                        Placeholder.unparsed("tenant", tenant),
-                        Placeholder.unparsed("price", CurrencyFormatter.format(leasehold.price())),
-                        Placeholder.unparsed("duration",
-                                DurationFormatter.format(Duration.ofSeconds(leasehold.durationSeconds()))),
-                        Placeholder.unparsed("start_date", leasehold.startDate() != null
+                .append(messages.component(MessageKeys.INFO_LEASEHOLD,
+                        "landlord", resolveName(leasehold.landlordId()),
+                        "members", membersStr,
+                        "tenant", tenant,
+                        "price", CurrencyFormatter.format(leasehold.price()),
+                        "duration", DurationFormatter.format(Duration.ofSeconds(leasehold.durationSeconds())),
+                        "start_date", leasehold.startDate() != null
                                 ? DateFormatter.format(settings.get().dateFormat(), leasehold.startDate())
-                                : "N/A"),
-                        Placeholder.unparsed("end_date", leasehold.endDate() != null
+                                : "N/A",
+                        "end_date", leasehold.endDate() != null
                                 ? DateFormatter.format(settings.get().dateFormat(), leasehold.endDate())
-                                : "N/A"),
-                        Placeholder.unparsed("time_left", DurationFormatter.formatTimeLeft(leasehold.endDate())),
-                        Placeholder.unparsed("extensions", extensions)));
+                                : "N/A",
+                        "time_left", DurationFormatter.formatTimeLeft(leasehold.endDate()),
+                        "extensions", extensions));
     }
 
 }

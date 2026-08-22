@@ -6,7 +6,7 @@ import io.github.md5sha256.realty.api.SignTextApplicator;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.api.RealtyBackend;
 import io.github.md5sha256.realty.database.SqlSessionWrapper;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.api.ExecutorState;
 import io.papermc.paper.event.player.PlayerOpenSignEvent;
@@ -44,7 +44,7 @@ public class SignInteractionListener implements Listener {
     private final ExecutorState executorState;
     private final SignCache signCache;
     private final SignTextApplicator signTextApplicator;
-    private final MessageContainer messages;
+    private final Message messages;
 
     public SignInteractionListener(@NotNull Database database,
                                     @NotNull RealtyBackend logic,
@@ -52,7 +52,7 @@ public class SignInteractionListener implements Listener {
                                     @NotNull ExecutorState executorState,
                                     @NotNull SignCache signCache,
                                     @NotNull SignTextApplicator signTextApplicator,
-                                    @NotNull MessageContainer messages) {
+                                    @NotNull Message messages) {
         this.database = database;
         this.logic = logic;
         this.regionProfileService = regionProfileService;
@@ -138,7 +138,7 @@ public class SignInteractionListener implements Listener {
                 try (SqlSessionWrapper session = database.openSession(true)) {
                     session.realtySignMapper().deleteByPosition(worldId, blockX, blockY, blockZ);
                 }
-                player.sendMessage(messages.messageFor(MessageKeys.SIGN_REMOVE_SUCCESS));
+                player.sendMessage(messages.component(MessageKeys.SIGN_REMOVE_SUCCESS));
             });
         }
     }

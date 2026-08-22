@@ -2,8 +2,6 @@ package io.github.md5sha256.realty;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.minecraftcitiesnetwork.pluginInfrastructure.configurate.ComponentSerializer;
-import com.minecraftcitiesnetwork.pluginInfrastructure.configurate.SimpleDateFormatSerializer;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLoader;
 import com.minecraftcitiesnetwork.pluginInfrastructure.util.DateFormatter;
@@ -78,8 +76,9 @@ import io.github.md5sha256.realty.listener.SubregionWandListener;
 import io.github.md5sha256.realty.command.SubregionDialog;
 import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
+import io.github.md5sha256.realty.localisation.MessagesYamlConverter;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.GroupedRegionProfile;
 import io.github.md5sha256.realty.settings.RealtyTags;
@@ -93,7 +92,6 @@ import io.paradaux.hibernia.framework.configurator.ConfigurationLoader;
 import io.paradaux.hibernia.framework.guice.HiberniaModule;
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import io.github.md5sha256.realty.economy.EconomyProvider;
 import io.github.md5sha256.realty.economy.GovernmentAccountLookup;
 import io.github.md5sha256.realty.party.PartyDomains;
@@ -115,9 +113,6 @@ import org.incendo.cloud.paper.util.sender.PaperSimpleSenderMapper;
 import org.incendo.cloud.paper.util.sender.Source;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.ConfigurationNode;
-import org.spongepowered.configurate.yaml.NodeStyle;
-import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -154,7 +149,7 @@ public final class Realty extends JavaPlugin {
             "settings.yml", "database.yml", "profiles.yml", "region-tags.yml", "taxes.yml"
     };
 
-    private final MessageContainer messageContainer = new MessageContainer();
+    private Message messageContainer;
     private final AtomicReference<Settings> settings = new AtomicReference<>();
     private final AtomicReference<RegionProfileSettings> regionFlagSettings = new AtomicReference<>();
     private final AtomicReference<RealtyTags> realtyTags = new AtomicReference<>();
@@ -240,11 +235,14 @@ public final class Realty extends JavaPlugin {
     public void onLoad() {
         try {
             initDataFolder();
-            copyResourceTemplate("messages.yml", "defaults/default-messages.yml");
+            copyResourceTemplate("messages.properties", "defaults/default-messages.properties");
             copyResourceTemplate("settings.yml", "defaults/default-settings.yml");
             copyResourceTemplate("profiles.yml", "defaults/default-profiles.yml");
             copyResourceTemplate("taxes.yml", "defaults/default-taxes.yml");
-            reloadMessages();
+            // Carry an operator's customised messages.yml across before the framework's message
+            // bean runs; it writes a stock messages.properties when it finds none, which would
+            // silently discard their edits.
+            MessagesYamlConverter.migrateIfNeeded(getDataFolder().toPath(), getLogger());
             // Built during onLoad, not onEnable: the database settings decide whether the plugin
             // may enable at all, and the profile and tag settings are needed before the first
             // region is touched. The injector itself comes later, once the services exist.
@@ -252,7 +250,6 @@ public final class Realty extends JavaPlugin {
                     .scanConfiguration("io.github.md5sha256.realty.settings")
                     .scanConfiguration("io.github.md5sha256.realty")
                     .reconcileFiles(CONFIG_FILES)
-                    .withoutMessages()
                     .build();
             this.databaseSettings = this.hibernia.configuration(DatabaseSettings.class);
             this.settings.set(this.hibernia.configuration(Settings.class));
@@ -446,6 +443,7 @@ public final class Realty extends JavaPlugin {
                 this.subregionWand,
                 this.subregionWandManager));
         this.configuration = created.getInstance(ConfigurationLoader.class);
+        this.messageContainer = created.getInstance(Message.class);
         return created;
     }
 
@@ -507,14 +505,14 @@ public final class Realty extends JavaPlugin {
                         if (auction.winnerId() != null) {
                             this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                     List.of(auction.winnerId()),
-                                    this.messageContainer.messageFor(MessageKeys.NOTIFICATION_AUCTION_WON,
-                                            Placeholder.unparsed("region", auction.worldGuardRegionId())),
+                                    this.messageContainer.component(MessageKeys.NOTIFICATION_AUCTION_WON,
+                                            "region", auction.worldGuardRegionId()),
                                     wgRegion));
                         } else {
                             this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                     List.of(auction.auctioneerId()),
-                                    this.messageContainer.messageFor(MessageKeys.NOTIFICATION_AUCTION_ENDED_NO_BIDS,
-                                            Placeholder.unparsed("region", auction.worldGuardRegionId())),
+                                    this.messageContainer.component(MessageKeys.NOTIFICATION_AUCTION_ENDED_NO_BIDS,
+                                            "region", auction.worldGuardRegionId()),
                                     wgRegion));
                         }
                         if (wgRegion != null) {
@@ -531,10 +529,9 @@ public final class Realty extends JavaPlugin {
                         WorldGuardRegion wgRegion = resolveRegion(payment.worldId(), payment.regionId());
                         this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                 List.of(payment.bidderId()),
-                                this.messageContainer.messageFor(MessageKeys.NOTIFICATION_BID_PAYMENT_EXPIRED,
-                                        Placeholder.unparsed("region", payment.regionId()),
-                                        Placeholder.unparsed("amount",
-                                                CurrencyFormatter.format(payment.refundAmount()))),
+                                this.messageContainer.component(MessageKeys.NOTIFICATION_BID_PAYMENT_EXPIRED,
+                                        "region", payment.regionId(),
+                                        "amount", CurrencyFormatter.format(payment.refundAmount())),
                                 wgRegion));
                     }
                 });
@@ -546,10 +543,9 @@ public final class Realty extends JavaPlugin {
                         WorldGuardRegion wgRegion = resolveRegion(payment.worldId(), payment.regionId());
                         this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                 List.of(payment.offererId()),
-                                this.messageContainer.messageFor(MessageKeys.NOTIFICATION_OFFER_PAYMENT_EXPIRED,
-                                        Placeholder.unparsed("region", payment.regionId()),
-                                        Placeholder.unparsed("amount",
-                                                CurrencyFormatter.format(payment.refundAmount()))),
+                                this.messageContainer.component(MessageKeys.NOTIFICATION_OFFER_PAYMENT_EXPIRED,
+                                        "region", payment.regionId(),
+                                        "amount", CurrencyFormatter.format(payment.refundAmount())),
                                 wgRegion));
                     }
                 });
@@ -721,11 +717,6 @@ public final class Realty extends JavaPlugin {
         });
     }
 
-    private void reloadMessages() throws IOException {
-        ConfigurationNode node = copyDefaultsYaml("messages");
-        this.messageContainer.load(node);
-    }
-
     private void configureRegionFlagService(@NotNull RegionProfileSettings settings) {
         this.regionProfileService.clearGroupedFlagProfiles();
         this.regionProfileService.clearGroupedSignProfiles();
@@ -776,7 +767,7 @@ public final class Realty extends JavaPlugin {
         this.profileApplicator.applyAll(this.settings.get().profileReapplyPerTick());
         this.taxSettings.set(this.configuration.getComponent(TaxSettings.class));
         this.partyService.refresh();
-        reloadMessages();
+        this.messageContainer.reload();
         warnOrphanedTags();
         reloadModules();
     }
@@ -842,7 +833,7 @@ public final class Realty extends JavaPlugin {
     private void registerCommands(
             @NotNull RealtyPaperApi paperApi,
             @NotNull ExecutorState executorState,
-            @NotNull MessageContainer messageContainer,
+            @NotNull Message messageContainer,
             @NotNull SafeLocationFinder safeLocationFinder
     ) {
         String version = getPluginMeta().getVersion();
@@ -957,43 +948,5 @@ public final class Realty extends JavaPlugin {
         }
     }
 
-    private ConfigurationNode copyDefaultsYaml(@NotNull String resourceName) throws IOException {
-        String fileName = resourceName + ".yml";
-        File file = new File(getDataFolder(), fileName);
-        if (!file.exists()) {
-            try (FileOutputStream fileOutputStream = new FileOutputStream(file);
-                 InputStream inputStream = getResource(fileName)) {
-                if (inputStream == null) {
-                    getLogger().severe("Failed to copy default resource: " + fileName);
-                } else {
-                    inputStream.transferTo(fileOutputStream);
-                }
-            }
-        }
-        YamlConfigurationLoader existingLoader = yamlLoader()
-                .file(file)
-                .build();
-        ConfigurationNode existingRoot = existingLoader.load();
-        try (InputStream defaultStream = getResource(fileName)) {
-            if (defaultStream != null) {
-                YamlConfigurationLoader defaultsLoader = yamlLoader()
-                        .source(() -> new BufferedReader(
-                                new InputStreamReader(defaultStream, StandardCharsets.UTF_8)))
-                        .build();
-                ConfigurationNode defaultsRoot = defaultsLoader.load();
-                existingRoot.mergeFrom(defaultsRoot);
-                existingLoader.save(existingRoot);
-            }
-        }
-        return existingRoot;
-    }
 
-
-    private YamlConfigurationLoader.Builder yamlLoader() {
-        return YamlConfigurationLoader.builder()
-                .defaultOptions(options -> options.serializers(builder -> builder
-                        .register(Component.class, ComponentSerializer.MINI_MESSAGE)
-                        .register(SimpleDateFormat.class, SimpleDateFormatSerializer.INSTANCE)))
-                .nodeStyle(NodeStyle.BLOCK);
-    }
 }

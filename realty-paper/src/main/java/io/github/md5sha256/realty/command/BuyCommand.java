@@ -7,9 +7,8 @@ import io.github.md5sha256.realty.api.event.RegionBoughtEvent;
 import io.github.md5sha256.realty.api.event.RegionBuyEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.incendo.cloud.paper.util.sender.Source;
 
 import org.bukkit.entity.Player;
@@ -27,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public record BuyCommand(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events
 ) implements CustomCommandBean.Single {
 
@@ -43,53 +42,53 @@ public record BuyCommand(
 
     private void execute(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         // Cancellable pre-event (main thread); a veto stops the action before the API is called.
         if (!events.fireSync(new RegionBuyEvent(region, sender.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.buy(region, sender.getUniqueId()).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.BuyResult.Success success -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.BUY_SUCCESS,
-                            Placeholder.unparsed("price", CurrencyFormatter.format(success.price())),
-                            Placeholder.unparsed("region", success.regionId())));
+                    sender.sendMessage(messages.component(MessageKeys.BUY_SUCCESS,
+                            "price", CurrencyFormatter.format(success.price()),
+                            "region", success.regionId()));
                     // Post-event; fireSync hops to the main thread. RegionNotificationListener notifies the seller.
                     events.fireSync(new RegionBoughtEvent(region, sender.getUniqueId(),
                             success.previousTitleHolderId(), success.price()));
                 }
                 case RealtyPaperApi.BuyResult.NoFreeholdContract noContract ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_NO_FREEHOLD_CONTRACT,
-                                Placeholder.unparsed("region", noContract.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_NO_FREEHOLD_CONTRACT,
+                                "region", noContract.regionId()));
                 case RealtyPaperApi.BuyResult.NotForSale notForSale ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_NOT_FOR_SALE,
-                                Placeholder.unparsed("region", notForSale.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_NOT_FOR_SALE,
+                                "region", notForSale.regionId()));
                 case RealtyPaperApi.BuyResult.IsAuthority ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_IS_AUTHORITY));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_IS_AUTHORITY));
                 case RealtyPaperApi.BuyResult.IsTitleHolder ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_IS_TITLE_HOLDER));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_IS_TITLE_HOLDER));
                 case RealtyPaperApi.BuyResult.InsufficientFunds insufficient ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_INSUFFICIENT_FUNDS,
-                                Placeholder.unparsed("price", CurrencyFormatter.format(insufficient.price())),
-                                Placeholder.unparsed("balance", CurrencyFormatter.format(insufficient.balance()))));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_INSUFFICIENT_FUNDS,
+                                "price", CurrencyFormatter.format(insufficient.price()),
+                                "balance", CurrencyFormatter.format(insufficient.balance())));
                 case RealtyPaperApi.BuyResult.PaymentFailed failed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_PAYMENT_FAILED,
-                                Placeholder.unparsed("error", failed.error())));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_PAYMENT_FAILED,
+                                "error", failed.error()));
                 case RealtyPaperApi.BuyResult.TransferFailed transferFailed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_TRANSFER_FAILED,
-                                Placeholder.unparsed("region", transferFailed.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_TRANSFER_FAILED,
+                                "region", transferFailed.regionId()));
                 case RealtyPaperApi.BuyResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.BUY_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.BUY_ERROR,
+                                "error", error.message()));
             }
         });
     }

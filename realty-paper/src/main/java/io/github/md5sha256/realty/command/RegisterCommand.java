@@ -10,10 +10,9 @@ import io.github.md5sha256.realty.command.util.ParseBounds;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -38,7 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public record RegisterCommand(@NotNull RealtyPaperApi api,
                               @NotNull AtomicReference<Settings> settings,
-                              @NotNull MessageContainer messages,
+                              @NotNull Message messages,
                               @NotNull RealtyEventDispatch events,
                               @NotNull PartyService parties) implements CustomCommandBean {
 
@@ -100,34 +99,34 @@ public record RegisterCommand(@NotNull RealtyPaperApi api,
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         if (sender instanceof Player player
                 && !events.fireSync(new RegionCreateEvent(region, player.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.registerLeasehold(region, price, period.toSeconds(), maxExtensions, landlord)
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyPaperApi.CreateLeaseholdResult.Success ignored -> {
-                                sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_RENTAL_SUCCESS));
+                                sender.sendMessage(messages.component(MessageKeys.REGISTER_RENTAL_SUCCESS));
                                 if (sender instanceof Player player) {
                                     events.fireSync(new RegionCreatedEvent(region, player.getUniqueId()));
                                 }
                         }
                         case RealtyPaperApi.CreateLeaseholdResult.AlreadyRegistered ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_RENTAL_ALREADY_REGISTERED));
+                                sender.sendMessage(messages.component(MessageKeys.REGISTER_RENTAL_ALREADY_REGISTERED));
                         case RealtyPaperApi.CreateLeaseholdResult.Error error ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_RENTAL_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                sender.sendMessage(messages.component(MessageKeys.REGISTER_RENTAL_ERROR,
+                                        "error", error.message()));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_RENTAL_ERROR,
-                            Placeholder.unparsed("error", cause.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.REGISTER_RENTAL_ERROR,
+                            "error", cause.getMessage()));
                     return null;
                 });
     }
@@ -143,34 +142,34 @@ public record RegisterCommand(@NotNull RealtyPaperApi api,
                 .orElseGet(() -> sender instanceof Player player
                         ? WorldGuardRegionResolver.resolveAtLocation(player.getLocation()) : null);
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         if (sender instanceof Player player
                 && !events.fireSync(new RegionCreateEvent(region, player.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.registerFreehold(region, price, authority, titleholder)
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyPaperApi.CreateFreeholdResult.Success ignored -> {
-                                sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_FREEHOLD_SUCCESS));
+                                sender.sendMessage(messages.component(MessageKeys.REGISTER_FREEHOLD_SUCCESS));
                                 if (sender instanceof Player player) {
                                     events.fireSync(new RegionCreatedEvent(region, player.getUniqueId()));
                                 }
                         }
                         case RealtyPaperApi.CreateFreeholdResult.AlreadyRegistered ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_FREEHOLD_ALREADY_REGISTERED));
+                                sender.sendMessage(messages.component(MessageKeys.REGISTER_FREEHOLD_ALREADY_REGISTERED));
                         case RealtyPaperApi.CreateFreeholdResult.Error error ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_FREEHOLD_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                sender.sendMessage(messages.component(MessageKeys.REGISTER_FREEHOLD_ERROR,
+                                        "error", error.message()));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    sender.sendMessage(messages.messageFor(MessageKeys.REGISTER_FREEHOLD_ERROR,
-                            Placeholder.unparsed("error", cause.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.REGISTER_FREEHOLD_ERROR,
+                            "error", cause.getMessage()));
                     return null;
                 });
     }

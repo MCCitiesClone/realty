@@ -7,10 +7,9 @@ import io.github.md5sha256.realty.api.event.AgentRemovedEvent;
 import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import org.incendo.cloud.paper.util.sender.Source;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -29,7 +28,7 @@ import java.util.UUID;
  * <p>Permission: {@code realty.command.agent.remove}.</p>
  */
 public record AgentRemoveCommand(@NotNull RealtyPaperApi api,
-                                  @NotNull MessageContainer messages,
+                                  @NotNull Message messages,
                                   @NotNull RealtyEventDispatch events) implements CustomCommandBean.Single {
 
     @Override
@@ -47,44 +46,44 @@ public record AgentRemoveCommand(@NotNull RealtyPaperApi api,
     private void execute(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         UUID targetId = ctx.get("player");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(player.getLocation()));
         if (region == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            player.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         UUID worldId = region.world().getUID();
         String targetName = resolveName(targetId);
         if (!region.region().getOwners().contains(player.getUniqueId())) {
-            sender.sendMessage(messages.messageFor(MessageKeys.AGENT_REMOVE_NOT_FOUND,
-                    Placeholder.unparsed("player", targetName),
-                    Placeholder.unparsed("region", regionId)));
+            sender.sendMessage(messages.component(MessageKeys.AGENT_REMOVE_NOT_FOUND,
+                    "player", targetName,
+                    "region", regionId));
             return;
         }
         UUID actorId = player.getUniqueId();
         api.removeSanctionedAuctioneer(regionId, worldId, targetId, actorId).thenAccept(rows -> {
             if (rows > 0) {
-                sender.sendMessage(messages.messageFor(MessageKeys.AGENT_REMOVE_SUCCESS,
-                        Placeholder.unparsed("player", targetName),
-                        Placeholder.unparsed("region", regionId)));
+                sender.sendMessage(messages.component(MessageKeys.AGENT_REMOVE_SUCCESS,
+                        "player", targetName,
+                        "region", regionId));
                 events.fireSync(new RealtyNotificationEvent(List.of(targetId),
-                        messages.messageFor(MessageKeys.NOTIFICATION_AGENT_REMOVED,
-                                Placeholder.unparsed("player", player.getName()),
-                                Placeholder.unparsed("region", regionId)), region));
+                        messages.component(MessageKeys.NOTIFICATION_AGENT_REMOVED,
+                                "player", player.getName(),
+                                "region", regionId), region));
                 events.fireSync(new AgentRemovedEvent(region, actorId, targetId));
             } else {
-                sender.sendMessage(messages.messageFor(MessageKeys.AGENT_REMOVE_NOT_FOUND,
-                        Placeholder.unparsed("player", targetName),
-                        Placeholder.unparsed("region", regionId)));
+                sender.sendMessage(messages.component(MessageKeys.AGENT_REMOVE_NOT_FOUND,
+                        "player", targetName,
+                        "region", regionId));
             }
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.messageFor(MessageKeys.AGENT_REMOVE_ERROR,
-                    Placeholder.unparsed("error", ex.getMessage())));
+            sender.sendMessage(messages.component(MessageKeys.AGENT_REMOVE_ERROR,
+                    "error", ex.getMessage()));
             return null;
         });
     }

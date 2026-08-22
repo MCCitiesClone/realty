@@ -20,10 +20,9 @@ import io.github.md5sha256.realty.database.entity.InboundOfferView;
 import io.github.md5sha256.realty.database.entity.OutboundOfferView;
 import io.github.md5sha256.realty.api.ExecutorState;
 import io.github.md5sha256.realty.party.PartyService;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -55,7 +54,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public record OfferCommandGroup(
         @NotNull RealtyPaperApi api,
-        @NotNull MessageContainer messages,
+        @NotNull Message messages,
         @NotNull RealtyEventDispatch events,
         @NotNull PartyService parties,
         @NotNull ExecutorState executorState
@@ -130,59 +129,59 @@ public record OfferCommandGroup(
 
     private void executeSend(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         double price = ctx.get("price");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         if (!events.fireSync(new OfferPlaceEvent(region, sender.getUniqueId(), price))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.placeOffer(regionId, region.world().getUID(), sender.getUniqueId(), price)
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.OfferResult.Success success -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.OFFER_SUCCESS,
-                                    Placeholder.unparsed("price", CurrencyFormatter.format(price)),
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.OFFER_SUCCESS,
+                                    "price", CurrencyFormatter.format(price),
+                                    "region", regionId));
                             if (success.titleHolderId() != null) {
                                 events.fireSync(new RealtyNotificationEvent(List.of(success.titleHolderId()),
-                                        messages.messageFor(MessageKeys.NOTIFICATION_OFFER_PLACED,
-                                                Placeholder.unparsed("player", sender.getName()),
-                                                Placeholder.unparsed("price", CurrencyFormatter.format(price)),
-                                                Placeholder.unparsed("region", regionId)), region));
+                                        messages.component(MessageKeys.NOTIFICATION_OFFER_PLACED,
+                                                "player", sender.getName(),
+                                                "price", CurrencyFormatter.format(price),
+                                                "region", regionId), region));
                             }
                             events.fireSync(new OfferPlacedEvent(region, sender.getUniqueId(),
                                     success.titleHolderId(), price));
                         }
                         case RealtyBackend.OfferResult.NoFreeholdContract ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.OFFER_NO_FREEHOLD_CONTRACT,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.OFFER_NO_FREEHOLD_CONTRACT,
+                                        "region", regionId));
                         case RealtyBackend.OfferResult.NotAcceptingOffers ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.OFFER_NOT_ACCEPTING,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.OFFER_NOT_ACCEPTING,
+                                        "region", regionId));
                         case RealtyBackend.OfferResult.IsOwner ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.OFFER_IS_OWNER));
+                                sender.sendMessage(messages.component(MessageKeys.OFFER_IS_OWNER));
                         case RealtyBackend.OfferResult.AlreadyHasOffer ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.OFFER_ALREADY_HAS_OFFER,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.OFFER_ALREADY_HAS_OFFER,
+                                        "region", regionId));
                         case RealtyBackend.OfferResult.AuctionExists ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.OFFER_AUCTION_EXISTS,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.OFFER_AUCTION_EXISTS,
+                                        "region", regionId));
                         case RealtyBackend.OfferResult.InsertFailed ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.OFFER_INSERT_FAILED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.OFFER_INSERT_FAILED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.OFFER_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.OFFER_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -191,18 +190,18 @@ public record OfferCommandGroup(
 
     private void executeOutbox(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         // Offers are always placed personally, so only the sender's own outbox applies here.
         api.listOutboundOffers(sender.getUniqueId()).thenAccept(offers -> {
             try {
                 if (offers.isEmpty()) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.OFFERS_LIST_NO_OFFERS));
+                    sender.sendMessage(messages.component(MessageKeys.OFFERS_LIST_NO_OFFERS));
                     return;
                 }
 
-                Component output = messages.messageFor(MessageKeys.OFFERS_LIST_HEADER);
+                Component output = messages.component(MessageKeys.OFFERS_LIST_HEADER);
 
                 for (OutboundOfferView offer : offers) {
                     String status;
@@ -215,17 +214,17 @@ public record OfferCommandGroup(
                         status = "Pending";
                     }
 
-                    output = output.appendNewline().append(messages.messageFor(MessageKeys.OFFERS_LIST_ENTRY,
-                            Placeholder.unparsed("region", offer.worldGuardRegionId()),
-                            Placeholder.unparsed("price", String.format("%.2f", offer.offerPrice())),
-                            Placeholder.unparsed("date", offer.offerTime().format(DateTimeFormatters.DATE_TIME)),
-                            Placeholder.unparsed("status", status)));
+                    output = output.appendNewline().append(messages.component(MessageKeys.OFFERS_LIST_ENTRY,
+                            "region", offer.worldGuardRegionId(),
+                            "price", String.format("%.2f", offer.offerPrice()),
+                            "date", offer.offerTime().format(DateTimeFormatters.DATE_TIME),
+                            "status", status));
                 }
 
                 sender.sendMessage(output);
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.OFFERS_LIST_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.OFFERS_LIST_ERROR,
+                        "error", ex.getMessage()));
             }
         });
     }
@@ -234,7 +233,7 @@ public record OfferCommandGroup(
 
     private void executeInbox(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         // A government's inbox belongs to the people who run it: include every government the
@@ -242,11 +241,11 @@ public record OfferCommandGroup(
         inboundForAllParties(sender.getUniqueId()).thenAccept(offers -> {
             try {
                 if (offers.isEmpty()) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.OFFERS_INBOUND_NO_OFFERS));
+                    sender.sendMessage(messages.component(MessageKeys.OFFERS_INBOUND_NO_OFFERS));
                     return;
                 }
 
-                Component output = messages.messageFor(MessageKeys.OFFERS_INBOUND_HEADER);
+                Component output = messages.component(MessageKeys.OFFERS_INBOUND_HEADER);
 
                 for (InboundOfferView offer : offers) {
                     OfflinePlayer offerer = Bukkit.getOfflinePlayer(offer.offererId());
@@ -262,18 +261,18 @@ public record OfferCommandGroup(
                         status = "Pending";
                     }
 
-                    output = output.appendNewline().append(messages.messageFor(MessageKeys.OFFERS_INBOUND_ENTRY,
-                            Placeholder.unparsed("region", offer.worldGuardRegionId()),
-                            Placeholder.unparsed("player", offererName),
-                            Placeholder.unparsed("price", String.format("%.2f", offer.offerPrice())),
-                            Placeholder.unparsed("date", offer.offerTime().format(DateTimeFormatters.DATE_TIME)),
-                            Placeholder.unparsed("status", status)));
+                    output = output.appendNewline().append(messages.component(MessageKeys.OFFERS_INBOUND_ENTRY,
+                            "region", offer.worldGuardRegionId(),
+                            "player", offererName,
+                            "price", String.format("%.2f", offer.offerPrice()),
+                            "date", offer.offerTime().format(DateTimeFormatters.DATE_TIME),
+                            "status", status));
                 }
 
                 sender.sendMessage(output);
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.OFFERS_INBOUND_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.OFFERS_INBOUND_ERROR,
+                        "error", ex.getMessage()));
             }
         });
     }
@@ -302,60 +301,60 @@ public record OfferCommandGroup(
 
     private void executeAccept(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         String playerName = ctx.get("player");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
         if (!target.hasPlayedBefore() && !target.isOnline()) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYER_NOT_FOUND,
-                    Placeholder.unparsed("player", playerName)));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYER_NOT_FOUND,
+                    "player", playerName));
             return;
         }
         String regionId = region.region().getId();
         if (!events.fireSync(new OfferAcceptEvent(region, sender.getUniqueId(), target.getUniqueId()))) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_ACTION_CANCELLED));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_ACTION_CANCELLED));
             return;
         }
         api.acceptOffer(regionId, region.world().getUID(), sender.getUniqueId(), target.getUniqueId())
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.AcceptOfferResult.Success ignored -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_SUCCESS,
-                                    Placeholder.unparsed("player", playerName),
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_SUCCESS,
+                                    "player", playerName,
+                                    "region", regionId));
                             events.fireSync(new RealtyNotificationEvent(List.of(target.getUniqueId()),
-                                    messages.messageFor(MessageKeys.NOTIFICATION_OFFER_ACCEPTED,
-                                            Placeholder.unparsed("region", regionId)), region));
+                                    messages.component(MessageKeys.NOTIFICATION_OFFER_ACCEPTED,
+                                            "region", regionId), region));
                             events.fireSync(new OfferAcceptedEvent(region, sender.getUniqueId(),
                                     target.getUniqueId()));
                         }
                         case RealtyBackend.AcceptOfferResult.NotSanctioned ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_NOT_SANCTIONED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_NOT_SANCTIONED,
+                                        "region", regionId));
                         case RealtyBackend.AcceptOfferResult.NoOffer ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_NO_OFFER,
-                                        Placeholder.unparsed("player", playerName),
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_NO_OFFER,
+                                        "player", playerName,
+                                        "region", regionId));
                         case RealtyBackend.AcceptOfferResult.AuctionExists ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_AUCTION_EXISTS,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_AUCTION_EXISTS,
+                                        "region", regionId));
                         case RealtyBackend.AcceptOfferResult.AlreadyAccepted ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_ALREADY_ACCEPTED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_ALREADY_ACCEPTED,
+                                        "region", regionId));
                         case RealtyBackend.AcceptOfferResult.InsertFailed ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_INSERT_FAILED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_INSERT_FAILED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.ACCEPT_OFFER_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.ACCEPT_OFFER_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -364,56 +363,56 @@ public record OfferCommandGroup(
 
     private void executePay(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         double amount = ctx.get("amount");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
         api.payOffer(region, sender.getUniqueId(), amount).thenAccept(result -> {
             switch (result) {
                 case RealtyPaperApi.PayOfferResult.Success success ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_SUCCESS,
-                                Placeholder.unparsed("amount", CurrencyFormatter.format(success.amount())),
-                                Placeholder.unparsed("region", success.regionId()),
-                                Placeholder.unparsed("total", CurrencyFormatter.format(success.newTotal())),
-                                Placeholder.unparsed("remaining", CurrencyFormatter.format(success.remaining()))));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_SUCCESS,
+                                "amount", CurrencyFormatter.format(success.amount()),
+                                "region", success.regionId(),
+                                "total", CurrencyFormatter.format(success.newTotal()),
+                                "remaining", CurrencyFormatter.format(success.remaining())));
                 case RealtyPaperApi.PayOfferResult.FullyPaid fullyPaid -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_TRANSFER_SUCCESS,
-                            Placeholder.unparsed("region", fullyPaid.regionId())));
+                    sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_TRANSFER_SUCCESS,
+                            "region", fullyPaid.regionId()));
                     if (fullyPaid.previousTitleHolderId() != null) {
                         events.fireSync(new RealtyNotificationEvent(List.of(fullyPaid.previousTitleHolderId()),
-                                messages.messageFor(MessageKeys.NOTIFICATION_OWNERSHIP_TRANSFERRED,
-                                        Placeholder.unparsed("player", sender.getName()),
-                                        Placeholder.unparsed("region", fullyPaid.regionId())), region));
+                                messages.component(MessageKeys.NOTIFICATION_OWNERSHIP_TRANSFERRED,
+                                        "player", sender.getName(),
+                                        "region", fullyPaid.regionId()), region));
                     }
                     events.fireSync(new OfferPurchaseCompletedEvent(region, sender.getUniqueId(),
                             fullyPaid.previousTitleHolderId(), fullyPaid.amount()));
                 }
                 case RealtyPaperApi.PayOfferResult.NoPaymentRecord noPayment ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_NO_PAYMENT_RECORD,
-                                Placeholder.unparsed("region", noPayment.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_NO_PAYMENT_RECORD,
+                                "region", noPayment.regionId()));
                 case RealtyPaperApi.PayOfferResult.ExceedsAmountOwed exceeds ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_EXCEEDS_OWED,
-                                Placeholder.unparsed("amount", CurrencyFormatter.format(exceeds.amount())),
-                                Placeholder.unparsed("owed", CurrencyFormatter.format(exceeds.amountOwed())),
-                                Placeholder.unparsed("region", exceeds.regionId())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_EXCEEDS_OWED,
+                                "amount", CurrencyFormatter.format(exceeds.amount()),
+                                "owed", CurrencyFormatter.format(exceeds.amountOwed()),
+                                "region", exceeds.regionId()));
                 case RealtyPaperApi.PayOfferResult.InsufficientFunds insufficient ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_INSUFFICIENT_FUNDS,
-                                Placeholder.unparsed("balance", CurrencyFormatter.format(insufficient.balance()))));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_INSUFFICIENT_FUNDS,
+                                "balance", CurrencyFormatter.format(insufficient.balance())));
                 case RealtyPaperApi.PayOfferResult.PaymentFailed failed ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_PAYMENT_FAILED,
-                                Placeholder.unparsed("error", failed.error())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_PAYMENT_FAILED,
+                                "error", failed.error()));
                 case RealtyPaperApi.PayOfferResult.TransferFailed ignored ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_TRANSFER_FAILED));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_TRANSFER_FAILED));
                 case RealtyPaperApi.PayOfferResult.Error error ->
-                        sender.sendMessage(messages.messageFor(MessageKeys.PAY_OFFER_ERROR,
-                                Placeholder.unparsed("error", error.message())));
+                        sender.sendMessage(messages.component(MessageKeys.PAY_OFFER_ERROR,
+                                "error", error.message()));
             }
         });
     }
@@ -422,13 +421,13 @@ public record OfferCommandGroup(
 
     private void executeWithdraw(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -436,26 +435,26 @@ public record OfferCommandGroup(
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.WithdrawOfferResult.Success(var titleHolderId) -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.WITHDRAW_OFFER_SUCCESS,
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.WITHDRAW_OFFER_SUCCESS,
+                                    "region", regionId));
                             if (titleHolderId != null) {
                                 events.fireSync(new RealtyNotificationEvent(List.of(titleHolderId),
-                                        messages.messageFor(MessageKeys.NOTIFICATION_OFFER_WITHDRAWN,
-                                                Placeholder.unparsed("player", sender.getName()),
-                                                Placeholder.unparsed("region", regionId)), region));
+                                        messages.component(MessageKeys.NOTIFICATION_OFFER_WITHDRAWN,
+                                                "player", sender.getName(),
+                                                "region", regionId), region));
                             }
                             events.fireSync(new OfferWithdrawnEvent(region, sender.getUniqueId(), titleHolderId));
                         }
                         case RealtyBackend.WithdrawOfferResult.NoOffer() ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.WITHDRAW_OFFER_NO_OFFER,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.WITHDRAW_OFFER_NO_OFFER,
+                                        "region", regionId));
                         case RealtyBackend.WithdrawOfferResult.OfferAccepted() ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.WITHDRAW_OFFER_ACCEPTED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.WITHDRAW_OFFER_ACCEPTED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.WITHDRAW_OFFER_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.WITHDRAW_OFFER_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -464,21 +463,21 @@ public record OfferCommandGroup(
 
     private void executeReject(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         String playerName = ctx.get("player");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         @SuppressWarnings("deprecation")
         OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
         if (!target.hasPlayedBefore() && !target.isOnline()) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYER_NOT_FOUND,
-                    Placeholder.unparsed("player", playerName)));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYER_NOT_FOUND,
+                    "player", playerName));
             return;
         }
         String regionId = region.region().getId();
@@ -486,29 +485,29 @@ public record OfferCommandGroup(
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.RejectOfferResult.Success ignored -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_SUCCESS,
-                                    Placeholder.unparsed("player", playerName),
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_SUCCESS,
+                                    "player", playerName,
+                                    "region", regionId));
                             events.fireSync(new RealtyNotificationEvent(List.of(target.getUniqueId()),
-                                    messages.messageFor(MessageKeys.NOTIFICATION_OFFER_REJECTED,
-                                            Placeholder.unparsed("region", regionId)), region));
+                                    messages.component(MessageKeys.NOTIFICATION_OFFER_REJECTED,
+                                            "region", regionId), region));
                             events.fireSync(new OfferRejectedEvent(region, sender.getUniqueId(),
                                     target.getUniqueId()));
                         }
                         case RealtyBackend.RejectOfferResult.NotSanctioned ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_NOT_SANCTIONED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_NOT_SANCTIONED,
+                                        "region", regionId));
                         case RealtyBackend.RejectOfferResult.NoOffer ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_NO_OFFER,
-                                        Placeholder.unparsed("player", playerName),
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_NO_OFFER,
+                                        "player", playerName,
+                                        "region", regionId));
                         case RealtyBackend.RejectOfferResult.OfferAccepted ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_ACCEPTED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_ACCEPTED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -517,13 +516,13 @@ public record OfferCommandGroup(
 
     private void executeRejectAll(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -531,31 +530,31 @@ public record OfferCommandGroup(
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.RejectAllOffersResult.Success success -> {
-                            sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_ALL_SUCCESS,
-                                    Placeholder.unparsed("count", String.valueOf(success.offererIds().size())),
-                                    Placeholder.unparsed("region", regionId)));
+                            sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_ALL_SUCCESS,
+                                    "count", String.valueOf(success.offererIds().size()),
+                                    "region", regionId));
                             if (!success.offererIds().isEmpty()) {
                                 events.fireSync(new RealtyNotificationEvent(List.copyOf(success.offererIds()),
-                                        messages.messageFor(MessageKeys.NOTIFICATION_OFFER_REJECTED,
-                                                Placeholder.unparsed("region", regionId)), region));
+                                        messages.component(MessageKeys.NOTIFICATION_OFFER_REJECTED,
+                                                "region", regionId), region));
                             }
                             for (UUID offererId : success.offererIds()) {
                                 events.fireSync(new OfferRejectedEvent(region, sender.getUniqueId(), offererId));
                             }
                         }
                         case RealtyBackend.RejectAllOffersResult.NotSanctioned ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_NOT_SANCTIONED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_NOT_SANCTIONED,
+                                        "region", regionId));
                         case RealtyBackend.RejectAllOffersResult.NoFreeholdContract ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_NO_FREEHOLD_CONTRACT,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_NO_FREEHOLD_CONTRACT,
+                                        "region", regionId));
                         case RealtyBackend.RejectAllOffersResult.OfferAccepted ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_ACCEPTED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_ACCEPTED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.REJECT_OFFER_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.REJECT_OFFER_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }
@@ -564,14 +563,14 @@ public record OfferCommandGroup(
 
     private void executeToggle(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player sender)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         boolean accepting = ctx.get("enabled");
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(sender.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -580,22 +579,22 @@ public record OfferCommandGroup(
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyBackend.ToggleOffersResult.Success success ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TOGGLE_OFFERS_SUCCESS,
-                                        Placeholder.unparsed("region", regionId),
-                                        Placeholder.unparsed("state", success.acceptingOffers() ? "yes" : "no")));
+                                sender.sendMessage(messages.component(MessageKeys.TOGGLE_OFFERS_SUCCESS,
+                                        "region", regionId,
+                                        "state", success.acceptingOffers() ? "yes" : "no"));
                         case RealtyBackend.ToggleOffersResult.NotSanctioned ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TOGGLE_OFFERS_NOT_SANCTIONED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TOGGLE_OFFERS_NOT_SANCTIONED,
+                                        "region", regionId));
                         case RealtyBackend.ToggleOffersResult.NoFreeholdContract ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TOGGLE_OFFERS_NO_FREEHOLD_CONTRACT,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TOGGLE_OFFERS_NO_FREEHOLD_CONTRACT,
+                                        "region", regionId));
                         case RealtyBackend.ToggleOffersResult.UpdateFailed ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.TOGGLE_OFFERS_UPDATE_FAILED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.TOGGLE_OFFERS_UPDATE_FAILED,
+                                        "region", regionId));
                     }
                 }).exceptionally(ex -> {
-                    sender.sendMessage(messages.messageFor(MessageKeys.TOGGLE_OFFERS_ERROR,
-                            Placeholder.unparsed("error", ex.getMessage())));
+                    sender.sendMessage(messages.component(MessageKeys.TOGGLE_OFFERS_ERROR,
+                            "error", ex.getMessage()));
                     return null;
                 });
     }

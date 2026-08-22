@@ -8,10 +8,9 @@ import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.SafeLocationFinder;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.entity.RealtySignEntity;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -40,7 +39,7 @@ public record TeleportCommand(
         @NotNull Logger logger,
         @NotNull RealtyPaperApi api,
         @NotNull AtomicReference<Settings> settings,
-                              @NotNull MessageContainer messages,
+                              @NotNull Message messages,
                               @NotNull SafeLocationFinder safeLocationFinder) implements CustomCommandBean.Single {
 
     private static final int SIGN_SEARCH_RADIUS = 3;
@@ -59,7 +58,7 @@ public record TeleportCommand(
     private void execute(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.get("region");
@@ -126,17 +125,17 @@ public record TeleportCommand(
         }
         if (ex != null) {
             ex.printStackTrace();
-            player.sendMessage(messages.messageFor(MessageKeys.TP_ERROR,
-                    Placeholder.unparsed("error", String.valueOf(ex.getMessage()))));
+            player.sendMessage(messages.component(MessageKeys.TP_ERROR,
+                    "error", String.valueOf(ex.getMessage())));
             return;
         }
         if (loc != null) {
             player.teleportAsync(loc);
-            player.sendMessage(messages.messageFor(MessageKeys.TP_SUCCESS,
-                    Placeholder.unparsed("region", regionId)));
+            player.sendMessage(messages.component(MessageKeys.TP_SUCCESS,
+                    "region", regionId));
         } else {
-            player.sendMessage(messages.messageFor(MessageKeys.TP_NO_SAFE_LOCATION,
-                    Placeholder.unparsed("region", regionId)));
+            player.sendMessage(messages.component(MessageKeys.TP_NO_SAFE_LOCATION,
+                    "region", regionId));
         }
     }
 }

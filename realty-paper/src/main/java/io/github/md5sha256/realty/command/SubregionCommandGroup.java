@@ -1,6 +1,6 @@
 package io.github.md5sha256.realty.command;
 
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
@@ -29,7 +29,7 @@ public record SubregionCommandGroup(
         @NotNull SubregionWand wand,
         @NotNull SubregionWandManager wandManager,
         @NotNull SubregionDialog dialog,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     @Override
@@ -54,31 +54,31 @@ public record SubregionCommandGroup(
 
     private void executeWand(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player player)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         ItemStack item = wand.createWand();
         player.getInventory().addItem(item).forEach((index, leftover) ->
                 player.getWorld().dropItem(player.getLocation(), leftover));
-        player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_WAND_GIVEN));
+        player.sendMessage(messages.component(MessageKeys.SUBREGION_WAND_GIVEN));
     }
 
     private void executeClear(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player player)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         if (wandManager.get(player.getUniqueId()) == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_NOTHING_TO_CLEAR));
+            player.sendMessage(messages.component(MessageKeys.SUBREGION_NOTHING_TO_CLEAR));
             return;
         }
         wandManager.clear(player.getUniqueId());
-        player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_SELECTION_CLEARED));
+        player.sendMessage(messages.component(MessageKeys.SUBREGION_SELECTION_CLEARED));
     }
 
     private void executeConfirm(@NotNull CommandContext<Source> ctx) {
         if (!(ctx.sender().source() instanceof Player player)) {
-            ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            ctx.sender().source().sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         dialog.openHeight(player);

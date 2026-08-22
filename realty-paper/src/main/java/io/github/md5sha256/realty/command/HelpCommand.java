@@ -1,6 +1,6 @@
 package io.github.md5sha256.realty.command;
 
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import org.bukkit.command.CommandSender;
 import org.incendo.cloud.paper.util.sender.Source;
@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
  * Permission: {@code realty.command.help}.</p>
  */
 public record HelpCommand(
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     private static final Set<String> VISIBLE_CATEGORIES = Set.of("basics", "management", "offers", "auctions");
@@ -52,14 +52,14 @@ public record HelpCommand(
 
     private void executeMain(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
-        sender.sendMessage(messages.messageFor(MessageKeys.HELP_MAIN));
+        sender.sendMessage(messages.component(MessageKeys.HELP_MAIN));
     }
 
     private void executeCategory(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         String category = ctx.<String>get("category").toLowerCase();
         if (!ALL_CATEGORIES.contains(category)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.HELP_UNKNOWN_CATEGORY));
+            sender.sendMessage(messages.component(MessageKeys.HELP_UNKNOWN_CATEGORY));
             return;
         }
         String key = switch (category) {
@@ -70,7 +70,7 @@ public record HelpCommand(
             case "admin" -> MessageKeys.HELP_ADMIN;
             default -> MessageKeys.HELP_UNKNOWN_CATEGORY;
         };
-        sender.sendMessage(messages.messageFor(key));
+        sender.sendMessage(messages.component(key));
     }
 
 }

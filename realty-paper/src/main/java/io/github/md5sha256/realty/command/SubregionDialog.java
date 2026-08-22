@@ -14,7 +14,7 @@ import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.SqlSessionWrapper;
 import io.github.md5sha256.realty.database.entity.FreeholdContractEntity;
 import io.github.md5sha256.realty.database.mapper.RegionTagMapper;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.RealtyTags;
@@ -32,7 +32,6 @@ import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -87,7 +86,7 @@ public final class SubregionDialog {
     private final SubregionWandManager wandManager;
     private final AtomicReference<Settings> settings;
     private final AtomicReference<RealtyTags> realtyTags;
-    private final MessageContainer messages;
+    private final Message messages;
     private final ConcurrentHashMap<UUID, SubregionState> playerStates = new ConcurrentHashMap<>();
 
     public SubregionDialog(@NotNull RealtyPaperApi api,
@@ -96,7 +95,7 @@ public final class SubregionDialog {
                            @NotNull SubregionWandManager wandManager,
                            @NotNull AtomicReference<Settings> settings,
                            @NotNull AtomicReference<RealtyTags> realtyTags,
-                           @NotNull MessageContainer messages) {
+                           @NotNull Message messages) {
         this.api = api;
         this.executorState = executorState;
         this.database = database;
@@ -113,7 +112,7 @@ public final class SubregionDialog {
     public void open(@NotNull Player player) {
         WandSelection wandSelection = wandManager.get(player.getUniqueId());
         if (wandSelection == null || !wandSelection.isComplete()) {
-            player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_SELECTION_INCOMPLETE));
+            player.sendMessage(messages.component(MessageKeys.SUBREGION_SELECTION_INCOMPLETE));
             return;
         }
         if (!wandSelection.heightSet()) {
@@ -126,16 +125,16 @@ public final class SubregionDialog {
 
         int minVolume = settings.get().subregionMinVolume();
         if (selection.getVolume() < minVolume) {
-            player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_TOO_SMALL,
-                    Placeholder.unparsed("volume", String.valueOf(selection.getVolume())),
-                    Placeholder.unparsed("min-volume", String.valueOf(minVolume))));
+            player.sendMessage(messages.component(MessageKeys.SUBREGION_TOO_SMALL,
+                    "volume", String.valueOf(selection.getVolume()),
+                    "min-volume", String.valueOf(minVolume)));
             return;
         }
 
         RegionManager regionManager = regionManager(world);
         if (regionManager == null) {
-            player.sendMessage(messages.messageFor(MessageKeys.COMMON_ERROR,
-                    Placeholder.unparsed("error", "Region manager unavailable")));
+            player.sendMessage(messages.component(MessageKeys.COMMON_ERROR,
+                    "error", "Region manager unavailable"));
             return;
         }
 
@@ -148,7 +147,7 @@ public final class SubregionDialog {
             String key = search.anyContaining()
                     ? MessageKeys.SUBREGION_NO_PARENT_CANDIDATES
                     : MessageKeys.SUBREGION_PARENT_OUTSIDE;
-            player.sendMessage(messages.messageFor(key));
+            player.sendMessage(messages.component(key));
             return;
         }
 
@@ -196,7 +195,7 @@ public final class SubregionDialog {
                     if (state.parentCandidates.isEmpty()) {
                         // anyFreehold means the only thing stopping us is the tag blacklist;
                         // otherwise the owned region simply isn't a freehold parent.
-                        player.sendMessage(messages.messageFor(anyFreehold
+                        player.sendMessage(messages.component(anyFreehold
                                 ? MessageKeys.SUBREGION_TAG_BLACKLISTED
                                 : MessageKeys.SUBREGION_PARENT_NOT_FREEHOLD));
                         return;
@@ -213,8 +212,8 @@ public final class SubregionDialog {
                 }, executorState.mainThreadExec())
                 .exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_CREATE_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    player.sendMessage(messages.component(MessageKeys.SUBREGION_CREATE_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
@@ -225,7 +224,7 @@ public final class SubregionDialog {
     public void openHeight(@NotNull Player player) {
         WandSelection selection = wandManager.get(player.getUniqueId());
         if (selection == null || !selection.isComplete()) {
-            player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_SELECTION_INCOMPLETE));
+            player.sendMessage(messages.component(MessageKeys.SUBREGION_SELECTION_INCOMPLETE));
             return;
         }
         showHeightDialog(player, selection);
@@ -265,7 +264,7 @@ public final class SubregionDialog {
         };
         DialogActionCallback clearCallback = (response, audience) -> {
             wandManager.clear(player.getUniqueId());
-            player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_SELECTION_CLEARED));
+            player.sendMessage(messages.component(MessageKeys.SUBREGION_SELECTION_CLEARED));
         };
 
         List<ActionButton> actions = new ArrayList<>();
@@ -499,8 +498,8 @@ public final class SubregionDialog {
         }
         ProtectedRegion parent = regionManager.getRegion(state.parentId);
         if (parent == null) {
-            state.error = messages.messageFor(MessageKeys.SUBREGION_NO_FREEHOLD,
-                    Placeholder.unparsed("region", state.parentId));
+            state.error = messages.component(MessageKeys.SUBREGION_NO_FREEHOLD,
+                    "region", state.parentId);
             showCreateDialog(player, state);
             return;
         }
@@ -518,25 +517,25 @@ public final class SubregionDialog {
                             wandManager.clear(player.getUniqueId());
                             playerStates.remove(player.getUniqueId());
                             applyTags(s.regionId(), new LinkedHashSet<>(state.selectedTags));
-                            player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_CREATE_SUCCESS,
-                                    Placeholder.unparsed("region", s.regionId()),
-                                    Placeholder.unparsed("parent", s.parentId())));
+                            player.sendMessage(messages.component(MessageKeys.SUBREGION_CREATE_SUCCESS,
+                                    "region", s.regionId(),
+                                    "parent", s.parentId()));
                         }
                         case RealtyPaperApi.QuickCreateSubregionResult.NoFreeholdContract nfc ->
-                                player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_NO_FREEHOLD,
-                                        Placeholder.unparsed("region", nfc.parentId())));
+                                player.sendMessage(messages.component(MessageKeys.SUBREGION_NO_FREEHOLD,
+                                        "region", nfc.parentId()));
                         case RealtyPaperApi.QuickCreateSubregionResult.RegionExists re ->
-                                player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_REGION_EXISTS,
-                                        Placeholder.unparsed("region", re.regionId())));
+                                player.sendMessage(messages.component(MessageKeys.SUBREGION_REGION_EXISTS,
+                                        "region", re.regionId()));
                         case RealtyPaperApi.QuickCreateSubregionResult.Error error ->
-                                player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_CREATE_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                player.sendMessage(messages.component(MessageKeys.SUBREGION_CREATE_ERROR,
+                                        "error", error.message()));
                     }
                 })
                 .exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    player.sendMessage(messages.messageFor(MessageKeys.SUBREGION_CREATE_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    player.sendMessage(messages.component(MessageKeys.SUBREGION_CREATE_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
@@ -564,23 +563,23 @@ public final class SubregionDialog {
     private @Nullable Component validate(@NotNull SubregionState state,
                                          @NotNull RegionManager regionManager) {
         if (state.name == null || !VALID_NAME_PATTERN.matcher(state.name).matches()) {
-            return messages.messageFor(MessageKeys.SUBREGION_INVALID_NAME,
-                    Placeholder.unparsed("region", String.valueOf(state.name)));
+            return messages.component(MessageKeys.SUBREGION_INVALID_NAME,
+                    "region", String.valueOf(state.name));
         }
         if (regionManager.getRegion(state.name) != null) {
-            return messages.messageFor(MessageKeys.SUBREGION_REGION_EXISTS,
-                    Placeholder.unparsed("region", state.name));
+            return messages.component(MessageKeys.SUBREGION_REGION_EXISTS,
+                    "region", state.name);
         }
         ProtectedRegion parent = regionManager.getRegion(state.parentId);
         if (parent == null) {
-            return messages.messageFor(MessageKeys.SUBREGION_NO_FREEHOLD,
-                    Placeholder.unparsed("region", String.valueOf(state.parentId)));
+            return messages.component(MessageKeys.SUBREGION_NO_FREEHOLD,
+                    "region", String.valueOf(state.parentId));
         }
         ProtectedRegion sibling = SubregionSelectionValidator.overlappingSibling(
                 state.selection, parent, regionManager);
         if (sibling != null) {
-            return messages.messageFor(MessageKeys.SUBREGION_OVERLAPS_SIBLING,
-                    Placeholder.unparsed("sibling", sibling.getId()));
+            return messages.component(MessageKeys.SUBREGION_OVERLAPS_SIBLING,
+                    "sibling", sibling.getId());
         }
         if (parsePrice(state.price) <= 0) {
             return error("Price must be more than 0.");
@@ -596,7 +595,7 @@ public final class SubregionDialog {
     }
 
     private @NotNull Component error(@NotNull String text) {
-        return messages.messageFor(MessageKeys.COMMON_ERROR, Placeholder.unparsed("error", text));
+        return messages.component(MessageKeys.COMMON_ERROR, "error", text);
     }
 
     private void saveCreate(@NotNull SubregionState state, @NotNull DialogResponseView response) {

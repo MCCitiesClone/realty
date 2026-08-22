@@ -4,10 +4,9 @@ import io.github.md5sha256.realty.api.ExecutorState;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.SqlSessionWrapper;
 import io.github.md5sha256.realty.database.mapper.RegionTagMapper;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.RealtyTags;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -23,7 +22,7 @@ public record CleanupCommandGroup(
         @NotNull Database database,
         @NotNull ExecutorState executorState,
         @NotNull AtomicReference<RealtyTags> realtyTags,
-        @NotNull MessageContainer messages
+        @NotNull Message messages
 ) implements CustomCommandBean {
 
     @Override
@@ -50,14 +49,14 @@ public record CleanupCommandGroup(
                     deleted = mapper.deleteByTagIdNotIn(configTagIds);
                 }
                 if (deleted == 0) {
-                    sender.sendMessage(messages.messageFor(MessageKeys.CLEANUP_TAGS_NONE));
+                    sender.sendMessage(messages.component(MessageKeys.CLEANUP_TAGS_NONE));
                 } else {
-                    sender.sendMessage(messages.messageFor(MessageKeys.CLEANUP_TAGS_SUCCESS,
-                            Placeholder.unparsed("count", String.valueOf(deleted))));
+                    sender.sendMessage(messages.component(MessageKeys.CLEANUP_TAGS_SUCCESS,
+                            "count", String.valueOf(deleted)));
                 }
             } catch (Exception ex) {
-                sender.sendMessage(messages.messageFor(MessageKeys.CLEANUP_TAGS_ERROR,
-                        Placeholder.unparsed("error", ex.getMessage())));
+                sender.sendMessage(messages.component(MessageKeys.CLEANUP_TAGS_ERROR,
+                        "error", ex.getMessage()));
             }
         }, executorState.dbExec());
     }

@@ -12,10 +12,11 @@ import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.entity.RealtySignEntity;
 import io.github.md5sha256.realty.party.PartyService;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.api.ExecutorState;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -39,7 +40,7 @@ import java.util.UUID;
  */
 public record SignCommand(@NotNull RealtyPaperApi api,
                            @NotNull ExecutorState executorState,
-                           @NotNull MessageContainer messages,
+                           @NotNull Message messages,
                            @NotNull PartyService parties) implements CustomCommandBean {
 
     @Override
@@ -72,18 +73,18 @@ public record SignCommand(@NotNull RealtyPaperApi api,
     private void executePlace(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         Block targetBlock = player.getTargetBlockExact(5);
         if (targetBlock == null || !(targetBlock.getState() instanceof Sign)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_NOT_A_SIGN));
+            sender.sendMessage(messages.component(MessageKeys.SIGN_PLACE_NOT_A_SIGN));
             return;
         }
         // The player must be able to build where the sign physically sits, so signs cannot
         // be registered inside a region the player has no access to.
         if (!canBuildAt(player, targetBlock)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_NO_BUILD_ACCESS));
+            sender.sendMessage(messages.component(MessageKeys.SIGN_PLACE_NO_BUILD_ACCESS));
             return;
         }
         WorldGuardRegion region = ctx.get("region");
@@ -104,16 +105,16 @@ public record SignCommand(@NotNull RealtyPaperApi api,
         api.getLeaseholdContract(regionId, worldId)
                 .thenAccept(lease -> {
                     if (lease == null || !parties.actsFor(player.getUniqueId(), lease.landlordId())) {
-                        player.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_NOT_LANDLORD,
-                                Placeholder.unparsed("region", regionId)));
+                        player.sendMessage(messages.component(MessageKeys.SIGN_PLACE_NOT_LANDLORD,
+                                "region", regionId));
                         return;
                     }
                     placeSign(player, region, regionId, signWorldId, blockX, blockY, blockZ);
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    player.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    player.sendMessage(messages.component(MessageKeys.SIGN_PLACE_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
@@ -125,20 +126,20 @@ public record SignCommand(@NotNull RealtyPaperApi api,
                 .thenAccept(result -> {
                     switch (result) {
                         case RealtyPaperApi.PlaceSignResult.Success ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_SUCCESS,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.SIGN_PLACE_SUCCESS,
+                                        "region", regionId));
                         case RealtyPaperApi.PlaceSignResult.NotRegistered ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_NOT_REGISTERED,
-                                        Placeholder.unparsed("region", regionId)));
+                                sender.sendMessage(messages.component(MessageKeys.SIGN_PLACE_NOT_REGISTERED,
+                                        "region", regionId));
                         case RealtyPaperApi.PlaceSignResult.Error error ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                sender.sendMessage(messages.component(MessageKeys.SIGN_PLACE_ERROR,
+                                        "error", error.message()));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    sender.sendMessage(messages.messageFor(MessageKeys.SIGN_PLACE_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.SIGN_PLACE_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
@@ -162,12 +163,12 @@ public record SignCommand(@NotNull RealtyPaperApi api,
     private void executeRemove(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         Block targetBlock = player.getTargetBlockExact(5);
         if (targetBlock == null || !(targetBlock.getState() instanceof Sign)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.SIGN_REMOVE_NOT_A_SIGN));
+            sender.sendMessage(messages.component(MessageKeys.SIGN_REMOVE_NOT_A_SIGN));
             return;
         }
         int blockX = targetBlock.getX();
@@ -182,19 +183,19 @@ public record SignCommand(@NotNull RealtyPaperApi api,
                         case RealtyPaperApi.RemoveSignResult.Success ignored -> {
                             executorState.mainThreadExec().execute(
                                     () -> SignTextApplicator.clearLines(sign));
-                            sender.sendMessage(messages.messageFor(MessageKeys.SIGN_REMOVE_SUCCESS));
+                            sender.sendMessage(messages.component(MessageKeys.SIGN_REMOVE_SUCCESS));
                         }
                         case RealtyPaperApi.RemoveSignResult.NotRegistered ignored ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.SIGN_REMOVE_NOT_REGISTERED));
+                                sender.sendMessage(messages.component(MessageKeys.SIGN_REMOVE_NOT_REGISTERED));
                         case RealtyPaperApi.RemoveSignResult.Error error ->
-                                sender.sendMessage(messages.messageFor(MessageKeys.SIGN_REMOVE_ERROR,
-                                        Placeholder.unparsed("error", error.message())));
+                                sender.sendMessage(messages.component(MessageKeys.SIGN_REMOVE_ERROR,
+                                        "error", error.message()));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    sender.sendMessage(messages.messageFor(MessageKeys.SIGN_REMOVE_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.SIGN_REMOVE_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
@@ -202,13 +203,13 @@ public record SignCommand(@NotNull RealtyPaperApi api,
     private void executeList(@NotNull CommandContext<Source> ctx) {
         CommandSender sender = ctx.sender().source();
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
+            sender.sendMessage(messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
         WorldGuardRegion region = ctx.<WorldGuardRegion>optional("region")
                 .orElseGet(() -> WorldGuardRegionResolver.resolveAtLocation(player.getLocation()));
         if (region == null) {
-            sender.sendMessage(messages.messageFor(MessageKeys.ERROR_NO_REGION));
+            sender.sendMessage(messages.component(MessageKeys.ERROR_NO_REGION));
             return;
         }
         String regionId = region.region().getId();
@@ -217,28 +218,46 @@ public record SignCommand(@NotNull RealtyPaperApi api,
         api.listSigns(regionId, worldId)
                 .thenAccept(signs -> {
                     if (signs.isEmpty()) {
-                        sender.sendMessage(messages.messageFor(MessageKeys.SIGN_LIST_NO_SIGNS,
-                                Placeholder.unparsed("region", regionId)));
+                        sender.sendMessage(messages.component(MessageKeys.SIGN_LIST_NO_SIGNS,
+                                "region", regionId));
                         return;
                     }
-                    sender.sendMessage(messages.messageFor(MessageKeys.SIGN_LIST_HEADER,
-                            Placeholder.unparsed("region", regionId)));
+                    sender.sendMessage(messages.component(MessageKeys.SIGN_LIST_HEADER,
+                            "region", regionId));
                     for (RealtySignEntity signEntity : signs) {
                         World signWorld = Bukkit.getWorld(signEntity.worldId());
                         String worldName = signWorld != null
                                 ? signWorld.getName() : signEntity.worldId().toString();
-                        sender.sendMessage(messages.messageFor(MessageKeys.SIGN_LIST_ENTRY,
-                                Placeholder.parsed("world", worldName),
-                                Placeholder.parsed("x", String.valueOf(signEntity.blockX())),
-                                Placeholder.parsed("y", String.valueOf(signEntity.blockY())),
-                                Placeholder.parsed("z", String.valueOf(signEntity.blockZ()))));
+                        sender.sendMessage(signListEntry(worldName, signEntity));
                     }
                 }).exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     cause.printStackTrace();
-                    sender.sendMessage(messages.messageFor(MessageKeys.SIGN_LIST_ERROR,
-                            Placeholder.unparsed("error", String.valueOf(cause.getMessage()))));
+                    sender.sendMessage(messages.component(MessageKeys.SIGN_LIST_ERROR,
+                            "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
     }
+
+    /**
+     * Renders one {@code /realty sign list} row.
+     *
+     * <p>The coordinates appear twice in that message: once as visible text and once inside the
+     * {@code <click:run_command:'/tp @s ...'>} argument. A resolver cannot reach inside a tag
+     * argument, so the teleport command was previously emitted with the placeholders still in it
+     * and the row was not actually clickable. {@code format} substitutes into the pattern before
+     * it is parsed, which fills both positions.</p>
+     *
+     * <p>Every value here is server-derived — a world name and three integers — so interpolating
+     * them as markup carries no player-controlled input.</p>
+     */
+    private @NotNull Component signListEntry(@NotNull String worldName,
+                                             @NotNull RealtySignEntity signEntity) {
+        return MiniMessage.miniMessage().deserialize(messages.format(MessageKeys.SIGN_LIST_ENTRY,
+                "world", worldName,
+                "x", String.valueOf(signEntity.blockX()),
+                "y", String.valueOf(signEntity.blockY()),
+                "z", String.valueOf(signEntity.blockZ())));
+    }
+
 }
