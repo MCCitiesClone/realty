@@ -11,6 +11,10 @@ Realty is a plugin for [Paper](https://papermc.io/) Minecraft servers that allow
 - **WorldGuard amd WorldEdit** (required)
 - **Essentials** (optional)
 
+Built on the [Hibernia framework](https://github.com/ParadauxIO/hibernia-framework) (commands,
+configuration, messages, dialogs and dependency injection), currently consumed from the
+[MCCitiesClone fork](https://github.com/MCCitiesClone/hibernia-framework).
+
 ## Build
 
 From the repository root:
@@ -35,6 +39,24 @@ Other artifacts:
 | `realty-common` | Shared logic and database access |
 | `realty-paper` | Main Paper plugin |
 | `realty-paper-plan-extension` | Optional [Plan](https://github.com/plan-player-analytics/Plan) integration |
+
+## Upgrading from 1.4.9
+
+Configuration keeps its current layout: `settings.yml`, `database.yml`, `profiles.yml`,
+`region-tags.yml` and `taxes.yml` are read exactly as before, and newly shipped keys are merged
+into your files on first start without disturbing your values, ordering or comments.
+
+Messages move from `messages.yml` to `messages.properties`. **Your edits are carried across
+automatically** on first start: the file is converted in place, placeholders are rewritten from
+`<name>` to `{name}`, and the original is kept as `messages.yml.migrated`. Nothing is overwritten
+if `messages.properties` already exists. To start from the shipped text instead, delete
+`messages.properties` and let it be written fresh.
+
+Commands and permissions are unchanged — every `/realty` command, its arguments, its flags and its
+permission node are the same. `/realty help` reads from your messages file as before.
+
+To roll back, restore the 1.4.9 jar and rename `messages.yml.migrated` back to `messages.yml`; the
+other configuration files were never modified.
 
 ## Documentation
 

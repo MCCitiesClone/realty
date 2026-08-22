@@ -141,37 +141,37 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 - [~] **T3.5** `hibernia.error.*` keys are not wired yet — nothing throws the semantic exceptions until the commands move in Phase 4, so this lands there.
 - [x] **T3.6** Test: every `MessageKeys` constant resolves; every `{placeholder}` in the bundle is supplied by at least one call site.
 
-## Phase 4 — Commands
+## Phase 4 — Commands  *(complete)*
 
-- [ ] **T4.1** Custom `ParameterResolver`s: `WorldGuardRegion` (omitted `[region]` arrives as `null` → existing stand-in-the-region fallback is preserved **verbatim**), `NamedAuthority`/party, `Duration`, `HistoryEventType`, `OccupancyFilter`, module name, tag id, help category.
-- [ ] **T4.2–T4.9** Port ~30 `CustomCommandBean`s to `@Command({"realty","rl"})` handler classes, one per current group. **Verified safe:** `CommandManager` merges multiple handler classes under one root label with startup conflict detection, so the flat `/realty` tree survives intact.
-- [ ] **T4.10** Flags via `@Flag` (T0.2).
-- [ ] **T4.11** `@Permission` per route, node strings unchanged; `paper-plugin.yml` untouched.
-- [ ] **T4.12** `HelpCommand` → upstream `HelpGenerator` + `@Description`, reproducing today's categories and pagination.
-- [ ] **T4.13** Replace `BrigadierArgumentSyntaxTest` with a route-registration validation test. Delete Cloud dep + relocations.
+- [x] **T4.1** Custom `ParameterResolver`s: `WorldGuardRegion` (omitted `[region]` arrives as `null` → existing stand-in-the-region fallback is preserved **verbatim**), `NamedAuthority`/party, `Duration`, `HistoryEventType`, `OccupancyFilter`, module name, tag id, help category.
+- [x] **T4.2–T4.9** Port ~30 `CustomCommandBean`s to `@Command({"realty","rl"})` handler classes, one per current group. **Verified safe:** `CommandManager` merges multiple handler classes under one root label with startup conflict detection, so the flat `/realty` tree survives intact.
+- [x] **T4.10** Flags via `@Flag` (T0.2).
+- [x] **T4.11** `@Permission` per route, node strings unchanged; `paper-plugin.yml` untouched.
+- [~] **T4.12** `HelpCommand` keeps its curated pages from `messages.properties` rather than adopting `HelpGenerator`. `HelpGenerator` renders the *registered routes*; Realty's help is hand-written prose grouped into five categories, and swapping it would change what every operator's players read. `@Description` is on every route regardless, so `HelpGenerator` remains available to anyone who wants it. Tab completion for `help <category>` is restored via `HelpCategoryResolver`.
+- [x] **T4.13** Replace `BrigadierArgumentSyntaxTest` with a route-registration validation test. Delete Cloud dep + relocations.
 
-## Phase 5 — Listeners
+## Phase 5 — Listeners  *(complete)*
 
-- [ ] **T5.1** `SignInteractionListener`, `SubregionWandListener`, `RegionNotificationListener` → `.listeners(...)` + `ListenerManager`.
-- [ ] **T5.2** `PropertyTaxListener` stays conditionally registered (Treasury-only) — `ListenerManager` registers unconditionally, so this one keeps manual registration behind the existing `isPluginEnabled("Treasury")` guard.
+- [x] **T5.1** `SignInteractionListener`, `SubregionWandListener`, `RegionNotificationListener` → `.listeners(...)` + `ListenerManager`.
+- [x] **T5.2** `PropertyTaxListener` stays conditionally registered (Treasury-only) — `ListenerManager` registers unconditionally, so this one keeps manual registration behind the existing `isPluginEnabled("Treasury")` guard.
 
-## Phase 6 — Dialogs (Usher)
+## Phase 6 — Dialogs (Usher)  *(complete)*
 
-- [ ] **T6.1** `SearchDialogHandler`: `@Screen` main (bool/text/option inputs — all covered by Usher's `TEXT/BOOLEAN/TOGGLE/NUMBER/OPTION` kinds), `@Screen` tags (dynamic grid via T0.4, dynamic `columns(...)` already supported), `@Screen` results. `SearchState` map → `@Model`; manual re-show → `DialogFlow.refresh()/back()`; DB search → `flow.await(...)`.
-- [ ] **T6.2** `SubregionDialogHandler`: height / create / tags / confirm screens. Dynamic `tag_N` inputs read via injected `DialogContext`.
-- [ ] **T6.3** `InputBinder`s for `DurationUnit` and `OccupancyFilter` if the built-in enum binding isn't sufficient.
-- [ ] **T6.4** Bedrock support is available for free via `.bedrockSupport(...)` — note as a follow-up, not in scope.
+- [x] **T6.1** `SearchDialogHandler`: `@Screen` main (bool/text/option inputs — all covered by Usher's `TEXT/BOOLEAN/TOGGLE/NUMBER/OPTION` kinds), `@Screen` tags (dynamic grid via T0.4, dynamic `columns(...)` already supported), `@Screen` results. `SearchState` map → `@Model`; manual re-show → `DialogFlow.refresh()/back()`; DB search → `flow.await(...)`.
+- [x] **T6.2** `SubregionDialogHandler`: height / create / tags / confirm screens. Dynamic `tag_N` inputs read via injected `DialogContext`.
+- [x] **T6.3** Not needed — Usher's built-in enum binding covers both.
+- [ ] **T6.4** Bedrock support via `.bedrockSupport(...)` — available for free, deliberately out of scope.
 
-## Phase 7 — Adapters, extension, importer
+## Phase 7 — Adapters, extension, importer  *(complete)*
 
-- [ ] **T7.1** Confirm both adapters load and deliver under relocation (chat + Essentials mail smoke test via `runServer`).
+- [~] **T7.1** Relocation verified against the built jar: no unrelocated `guice`/`guava`/`reflections`/`hibernia` entries, no bundled slf4j, and the adapters reference no relocated type. The live `runServer` load remains unrun here — see *Not verified*.
 - [x] **T7.2** `realty-areashop-importer` removed from this branch — the branch targets fresh servers and those already migrated off AreaShop, and the module's only dependency (the archived `md5sha256/AreaShop` fork) had stopped resolving, so CI already skipped it. `realty-paper-plan-extension`: verify only; it touches none of the migrated tiers.
 
 ## Phase 8 — Verification
 
-- [ ] **T8.1** All existing tests green; update only those coupled to Cloud/Configurate/MessageContainer.
-- [ ] **T8.2** `runServer` manual matrix: every command family, both dialogs, sign interaction, subregion wand, auction expiry, tax cycle, `/realty reload`, module reload.
-- [ ] **T8.3** Fresh-install and upgrade-from-1.4.9 runs — the upgrade path is the one operators actually take.
+- [x] **T8.1** All existing tests green; update only those coupled to Cloud/Configurate/MessageContainer.
+- [~] **T8.2** `runServer` manual matrix: every command family, both dialogs, sign interaction, subregion wand, auction expiry, tax cycle, `/realty reload`, module reload.
+- [~] **T8.3** Fresh-install and upgrade-from-1.4.9 runs — the upgrade path is the one operators actually take.
 
 ## Phase 9 — Docs
 
@@ -179,6 +179,14 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 - [ ] **T9.2** Operator upgrade note: what converts automatically (messages), what doesn't, how to roll back.
 
 ---
+
+## Not verified in this branch
+
+Everything below is green in the build; these are the checks a build cannot make.
+
+- **No server has run this.** `runServer` was never launched, so nothing here has been exercised against a live Paper instance: not a command, not a dialog, not the adapters loading under relocation, not the message or config upgrade path on a real data folder. The registration test proves the tree *binds*; it does not prove a handler *behaves*.
+- **The upgrade path is untested end to end.** The messages converter and the config defaults reconciliation both have unit tests, but no one has started 1.4.9, stopped it, and started this build over the same data folder.
+- **The framework fork is unreleased.** Realty pins a JitPack commit of `MCCitiesClone/hibernia-framework`. Nothing is published to a stable coordinate, and no PR has been opened upstream.
 
 ## Risk register
 
