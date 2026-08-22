@@ -34,6 +34,7 @@ Beyond the three planned prerequisites, the fork needed four more changes, each 
 | **`UUID` and `Set<T>`** (`7d68f66`) | Ordinary config shapes — authority account ids, grouped region name sets — that were simply unreachable. |
 | **Reconcile component-named files** (`3df3cb3`) | The old loader merged newly shipped default keys into operator files on every start. Hibernia's reconciler covered only `config.yml`/`messages.properties`, so per-file components would have silently stopped receiving new defaults on upgrade. |
 | **Tolerate no packaged `config.yml`** (`f15098b`) | Bukkit's `saveDefaultConfig()` throws when the jar ships none — which is exactly Realty's layout now that every component names its own file. |
+| **`paper-api` pinned to 1.21.8** (`46b1093`) | The fork must not compile against API absent on the lowest Paper version Realty supports. |
 
 ### Basing on develop — what it changes
 
@@ -49,7 +50,7 @@ Upstream `develop` carries an unreleased 1.2.0 with several things this plan had
 
 ⚠ **Atomic config reload changes T2.4.** `ConfigurationLoader.reload()` now swaps in fresh component instances rather than mutating them, so a Guice-injected config singleton captured at startup keeps showing its original values. Realty must read config through `ConfigurationLoader.getComponent(...)` at point of use. The existing `AtomicReference<Settings>` indirection therefore **does not disappear** — it is replaced by loader lookups, which is the same shape. (An earlier draft of this plan said the indirection could go; that was wrong.)
 
-⚠ **Paper API target.** `develop` bumped to `paper-api:1.21.11`; Realty compiles against `1.21.8`. To confirm before Phase 1 that the framework uses no API newer than 1.21.8, or bump Realty.
+~~⚠ **Paper API target.**~~ Settled: the fork is pinned back to `paper-api:1.21.8`. Its full suite and coverage gate pass there, so the 1.21.11 bump carried no real API dependency. Compiling against the lowest supported version is what guarantees the framework cannot reach for API absent on a 1.21.8 server.
 
 ---
 
@@ -115,7 +116,7 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 
 ## Phase 1 — Build, bootstrap, DI  *(complete)*
 
-- [x] **T1.1** Add the JitPack dependency on the fork to `realty-paper`; the `jitpack` repository is already in `realty-conventions`. Confirm the Paper API version question above first.
+- [x] **T1.1** Consumed from JitPack as `com.github.MCCitiesClone:hibernia-framework:3df3cb3`; verified resolving with no mavenLocal copy present. The Paper API question is settled: the fork is pinned to `paper-api:1.21.8`, matching Realty, and its suite passes there.
 - [x] **T1.2** shadowJar relocations for `com.google.inject`, `com.google.common`, `org.reflections`, `javax.inject`, `org.aopalliance`, `javassist`. **Verify against the adapter contract** — `chat-adapter` and `essentials-adapter` must still load; add a `runServer` smoke check to the task's done-criteria.
 - [x] **T1.3** New `RealtyModule extends AbstractModule` binding the services `Realty.java` currently constructs by hand: `Database`, `RealtyBackend`, `RealtyPaperApi`, `ExecutorState`, `PartyService`, `EconomyProvider`, `RegionProfileService`, `SignCache`, `SignTextApplicator`, `ProfileApplicator`, `RealtyEventDispatch`, `SquirrelIdUsernameResolver`, `SafeLocationFinder`, `ModuleLifecycleManager`.
 - [~] **T1.4** Economy resolution stays as `resolveEconomyProvider()` and is bound `toInstance`, not moved to `@Provides`. Its Treasury → Vault → self-disable sequence has to run *before* the injector exists, because a missing economy disables the plugin outright.
@@ -127,18 +128,18 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 - [x] **T2.2** `RegionProfileSettings` / `GroupedRegionProfile` / `RegionProfile` → nested components (needs T0.3).
 - [x] **T2.3** `RegionTagSettings` / `ConfigRegionTag` / `TagPermission` → list-of-components; keep runtime Bukkit permission registration and the orphaned-tag warning.
 - [x] **T2.4** `/realty reload` → `ConfigurationLoader.reload()`, then re-register tag permissions and re-run `ProfileApplicator.applyAll(...)`. Identity-preserving reload means the `AtomicReference<Settings>` indirection can go.
-- [~] **T2.5** Configurate is gone from `realty-backend` and `realty-paper-api`. It remains in `realty-paper` for `messages.yml` alone, and goes with Phase 3.
+- [x] **T2.5** Configurate is gone from all three modules — zero classes left in the shaded jar. The `geantyref` relocation stays: that comes from Cloud, and goes with it in Phase 4.
 
-## Phase 3 — Messages
+## Phase 3 — Messages  *(complete)*
 
 523 `messageFor(...)` call sites, 429 `MessageKeys` constants, 62 distinct placeholder names.
 
-- [ ] **T3.1** Build-time generator: flatten `messages.yml` → `messages.properties` (`a.b.c=`), rewriting `<name>` → `{name}` **only** for the 62 known placeholder names (`region`, `player`, `price`, `prefix`, …). MiniMessage tags (`<red>`, `<gradient:…>`, `<b>`, `<click:…>`) must pass through untouched — this is the one step where a naive regex silently corrupts 820 lines of formatting.
-- [ ] **T3.2** Runtime one-shot converter in `onLoad`: if `messages.yml` exists and `messages.properties` does not, run the same transform over the **operator's** file so their edits survive, then rename to `messages.yml.migrated`.
-- [ ] **T3.3** Rewrite the 523 call sites: `messages.messageFor(KEY, Placeholder.unparsed("region", id))` → `message.component(KEY, "region", id)`. Keep `MessageKeys` as constants, now holding property keys.
-- [ ] **T3.4** Pagination click-links (`MessageContainer.deserializeRaw`) → `Message.rich(...)`, which is the framework's sanctioned trusted-markup escape hatch. Delete `MessageContainer`.
-- [ ] **T3.5** Wire `hibernia.error.*` keys so semantic exceptions render in Realty's voice with the `{prefix}`.
-- [ ] **T3.6** Test: every `MessageKeys` constant resolves; every `{placeholder}` in the bundle is supplied by at least one call site.
+- [x] **T3.1** `MessagesYamlConverter` (unit-tested, and the same code path the runtime migration uses): flatten `messages.yml` → `messages.properties` (`a.b.c=`), rewriting `<name>` → `{name}` **only** for the 62 known placeholder names (`region`, `player`, `price`, `prefix`, …). MiniMessage tags (`<red>`, `<gradient:…>`, `<b>`, `<click:…>`) must pass through untouched — this is the one step where a naive regex silently corrupts 820 lines of formatting.
+- [x] **T3.2** Runtime one-shot converter in `onLoad`: if `messages.yml` exists and `messages.properties` does not, run the same transform over the **operator's** file so their edits survive, then rename to `messages.yml.migrated`.
+- [x] **T3.3** Rewrite the 523 call sites: `messages.messageFor(KEY, Placeholder.unparsed("region", id))` → `message.component(KEY, "region", id)`. Keep `MessageKeys` as constants, now holding property keys.
+- [x] **T3.4** Pagination click-links (`MessageContainer.deserializeRaw`) → `Message.rich(...)`, which is the framework's sanctioned trusted-markup escape hatch. Delete `MessageContainer`.
+- [~] **T3.5** `hibernia.error.*` keys are not wired yet — nothing throws the semantic exceptions until the commands move in Phase 4, so this lands there.
+- [x] **T3.6** Test: every `MessageKeys` constant resolves; every `{placeholder}` in the bundle is supplied by at least one call site.
 
 ## Phase 4 — Commands
 

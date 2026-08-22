@@ -24,7 +24,7 @@ dependencies {
     compileOnly("io.paradaux:treasury-api:2.2.1-SNAPSHOT")
     compileOnly("org.jetbrains:annotations:26.0.2-1")
     implementation("org.incendo:cloud-paper:2.0.0-beta.10")
-    implementation("io.paradaux:hibernia-framework:1.2.0-realty-SNAPSHOT") {
+    implementation("com.github.MCCitiesClone:hibernia-framework:3df3cb3") {
         // Paper supplies slf4j at runtime. Bundling reflections' slf4j-api 1.7.32 would either
         // clash with Paper's 2.x or, if relocated, bind the framework's logging to a
         // binding-less NOP logger that silently drops its warnings.

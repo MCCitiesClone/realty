@@ -8,7 +8,7 @@ dependencies {
     compileOnly("org.jetbrains:annotations:26.0.2-1")
     // Only for the annotations on DatabaseSettings; compileOnly because the shaded
     // plugin supplies (and relocates) the framework at runtime.
-    compileOnly("io.paradaux:hibernia-framework:1.2.0-realty-SNAPSHOT")
+    compileOnly("com.github.MCCitiesClone:hibernia-framework:3df3cb3")
     api("org.mybatis:mybatis:3.5.19")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.6")
 
