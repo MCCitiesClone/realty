@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "io.github.md5sha256"
-version = "1.4.5"
+version = "1.4.6"
 
 val targetJavaVersion = 21
 
