@@ -2,6 +2,7 @@ package io.github.md5sha256.realty;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.TypeLiteral;
+import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
 import io.github.md5sha256.realty.api.ExecutorState;
 import io.github.md5sha256.realty.api.ProfileApplicator;
 import io.github.md5sha256.realty.api.RealtyBackend;
@@ -63,6 +64,7 @@ public final class RealtyModule extends AbstractModule {
     private final SafeLocationFinder safeLocationFinder;
     private final SubregionWand subregionWand;
     private final SubregionWandManager subregionWandManager;
+    private final ModuleLifecycleManager<Realty> moduleManager;
 
     RealtyModule(@NotNull Realty plugin,
                  @NotNull Message messages,
@@ -84,7 +86,8 @@ public final class RealtyModule extends AbstractModule {
                  @NotNull SquirrelIdUsernameResolver nameResolver,
                  @NotNull SafeLocationFinder safeLocationFinder,
                  @NotNull SubregionWand subregionWand,
-                 @NotNull SubregionWandManager subregionWandManager) {
+                 @NotNull SubregionWandManager subregionWandManager,
+                 @NotNull ModuleLifecycleManager<Realty> moduleManager) {
         this.plugin = plugin;
         this.messages = messages;
         this.settings = settings;
@@ -106,6 +109,7 @@ public final class RealtyModule extends AbstractModule {
         this.safeLocationFinder = safeLocationFinder;
         this.subregionWand = subregionWand;
         this.subregionWandManager = subregionWandManager;
+        this.moduleManager = moduleManager;
     }
 
     @Override
@@ -130,6 +134,8 @@ public final class RealtyModule extends AbstractModule {
         bind(SafeLocationFinder.class).toInstance(this.safeLocationFinder);
         bind(SubregionWand.class).toInstance(this.subregionWand);
         bind(SubregionWandManager.class).toInstance(this.subregionWandManager);
+        bind(new TypeLiteral<ModuleLifecycleManager<Realty>>() {
+        }).toInstance(this.moduleManager);
 
         bind(new TypeLiteral<AtomicReference<Settings>>() {
         }).toInstance(this.settings);

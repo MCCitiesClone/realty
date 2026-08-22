@@ -1,5 +1,6 @@
 package io.github.md5sha256.realty.command;
 
+import com.google.inject.Inject;
 import io.github.md5sha256.realty.api.CurrencyFormatter;
 import io.github.md5sha256.realty.api.ExecutorState;
 import io.github.md5sha256.realty.database.Database;
@@ -94,6 +95,7 @@ public final class SearchDialog {
         final Map<String, TagState> tagStates = new LinkedHashMap<>();
     }
 
+    @Inject
     public SearchDialog(@NotNull Database database,
                         @NotNull ExecutorState executorState,
                         @NotNull AtomicReference<RealtyTags> realtyTags,

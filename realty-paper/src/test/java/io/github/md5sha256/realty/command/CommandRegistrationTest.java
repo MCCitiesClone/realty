@@ -5,6 +5,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
+import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
 import io.github.md5sha256.realty.Realty;
 import io.github.md5sha256.realty.api.ExecutorState;
 import io.github.md5sha256.realty.api.ProfileApplicator;
@@ -173,6 +174,8 @@ class CommandRegistrationTest {
             bind(SafeLocationFinder.class).toInstance(Mockito.mock(SafeLocationFinder.class));
             bind(SubregionWand.class).toInstance(Mockito.mock(SubregionWand.class));
             bind(SubregionWandManager.class).toInstance(Mockito.mock(SubregionWandManager.class));
+            bind(new TypeLiteral<ModuleLifecycleManager<Realty>>() {
+            }).toInstance(Mockito.mock(ModuleLifecycleManager.class));
             bind(new TypeLiteral<AtomicReference<Settings>>() {
             }).toInstance(new AtomicReference<>(defaults(Settings.class)));
             bind(new TypeLiteral<AtomicReference<RegionProfileSettings>>() {

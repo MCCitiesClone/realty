@@ -441,7 +441,8 @@ public final class Realty extends JavaPlugin {
                 this.nameResolver,
                 safeLocationFinder,
                 this.subregionWand,
-                this.subregionWandManager));
+                this.subregionWandManager,
+                this.moduleManager));
         this.configuration = created.getInstance(ConfigurationLoader.class);
         this.messageContainer = created.getInstance(Message.class);
         return created;

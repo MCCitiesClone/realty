@@ -1,5 +1,6 @@
 package io.github.md5sha256.realty.command;
 
+import com.google.inject.Inject;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldguard.WorldGuard;
@@ -89,6 +90,7 @@ public final class SubregionDialog {
     private final Message messages;
     private final ConcurrentHashMap<UUID, SubregionState> playerStates = new ConcurrentHashMap<>();
 
+    @Inject
     public SubregionDialog(@NotNull RealtyPaperApi api,
                            @NotNull ExecutorState executorState,
                            @NotNull Database database,
