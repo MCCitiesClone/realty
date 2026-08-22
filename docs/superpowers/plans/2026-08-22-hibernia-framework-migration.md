@@ -24,6 +24,17 @@
 
 Confirmed: extend the configurator with per-file components. All five operator-facing files (`settings.yml`, `database.yml`, `profiles.yml`, `region-tags.yml`, `taxes.yml`) keep their current names, contents and comments, so the upgrade is a no-op for every existing server. Implemented in T0.3.
 
+### Framework work added during implementation
+
+Beyond the three planned prerequisites, the fork needed four more changes, each found by the migration rather than predicted:
+
+| Change | Why it was needed |
+|---|---|
+| **Record binding** (`7d68f66`) | Every Realty settings type is an immutable record with a compact constructor that normalises defaults. Field injection cannot touch a record, and rewriting them as mutable POJOs would have destroyed that normalisation. Records are now *constructed*, so those constructors still run. |
+| **`UUID` and `Set<T>`** (`7d68f66`) | Ordinary config shapes — authority account ids, grouped region name sets — that were simply unreachable. |
+| **Reconcile component-named files** (`3df3cb3`) | The old loader merged newly shipped default keys into operator files on every start. Hibernia's reconciler covered only `config.yml`/`messages.properties`, so per-file components would have silently stopped receiving new defaults on upgrade. |
+| **Tolerate no packaged `config.yml`** (`f15098b`) | Bukkit's `saveDefaultConfig()` throws when the jar ships none — which is exactly Realty's layout now that every component names its own file. |
+
 ### Basing on develop — what it changes
 
 Upstream `develop` carries an unreleased 1.2.0 with several things this plan had budgeted for:
@@ -102,21 +113,21 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 
 ---
 
-## Phase 1 — Build, bootstrap, DI
+## Phase 1 — Build, bootstrap, DI  *(complete)*
 
-- [ ] **T1.1** Add the JitPack dependency on the fork to `realty-paper`; the `jitpack` repository is already in `realty-conventions`. Confirm the Paper API version question above first.
-- [ ] **T1.2** shadowJar relocations for `com.google.inject`, `com.google.common`, `org.reflections`, `javax.inject`, `org.aopalliance`, `javassist`. **Verify against the adapter contract** — `chat-adapter` and `essentials-adapter` must still load; add a `runServer` smoke check to the task's done-criteria.
-- [ ] **T1.3** New `RealtyModule extends AbstractModule` binding the services `Realty.java` currently constructs by hand: `Database`, `RealtyBackend`, `RealtyPaperApi`, `ExecutorState`, `PartyService`, `EconomyProvider`, `RegionProfileService`, `SignCache`, `SignTextApplicator`, `ProfileApplicator`, `RealtyEventDispatch`, `SquirrelIdUsernameResolver`, `SafeLocationFinder`, `ModuleLifecycleManager`.
-- [ ] **T1.4** Economy resolution (`Treasury` → `Vault` → self-disable) becomes a Guice `@Provides` method; the late-bound `PartyService`↔`RealtyBackend` cycle keeps its supplier indirection.
-- [ ] **T1.5** Rewrite `Realty.onEnable`/`onDisable` around `HiberniaModule` + injector. Preserve exactly: schema migration before anything touches the DB, executor shutdown order, modules started last and stopped first.
+- [x] **T1.1** Add the JitPack dependency on the fork to `realty-paper`; the `jitpack` repository is already in `realty-conventions`. Confirm the Paper API version question above first.
+- [x] **T1.2** shadowJar relocations for `com.google.inject`, `com.google.common`, `org.reflections`, `javax.inject`, `org.aopalliance`, `javassist`. **Verify against the adapter contract** — `chat-adapter` and `essentials-adapter` must still load; add a `runServer` smoke check to the task's done-criteria.
+- [x] **T1.3** New `RealtyModule extends AbstractModule` binding the services `Realty.java` currently constructs by hand: `Database`, `RealtyBackend`, `RealtyPaperApi`, `ExecutorState`, `PartyService`, `EconomyProvider`, `RegionProfileService`, `SignCache`, `SignTextApplicator`, `ProfileApplicator`, `RealtyEventDispatch`, `SquirrelIdUsernameResolver`, `SafeLocationFinder`, `ModuleLifecycleManager`.
+- [~] **T1.4** Economy resolution stays as `resolveEconomyProvider()` and is bound `toInstance`, not moved to `@Provides`. Its Treasury → Vault → self-disable sequence has to run *before* the injector exists, because a missing economy disables the plugin outright.
+- [~] **T1.5** `HiberniaModule` is built in `onLoad` (config must be readable before the plugin decides whether it can enable) and the injector in `onEnable`, after the service graph exists. `Realty.java` has not yet shrunk to a lifecycle shell — the Cloud command registration and the Configurate message loader still live there, and go in Phases 3–4.
 
-## Phase 2 — Configuration
+## Phase 2 — Configuration  *(complete)*
 
-- [ ] **T2.1** `DatabaseSettings`, `Settings`, `TaxSettings` → `@ConfigurationComponent` (flat; needs no T0.3 features).
-- [ ] **T2.2** `RegionProfileSettings` / `GroupedRegionProfile` / `RegionProfile` → nested components (needs T0.3).
-- [ ] **T2.3** `RegionTagSettings` / `ConfigRegionTag` / `TagPermission` → list-of-components; keep runtime Bukkit permission registration and the orphaned-tag warning.
-- [ ] **T2.4** `/realty reload` → `ConfigurationLoader.reload()`, then re-register tag permissions and re-run `ProfileApplicator.applyAll(...)`. Identity-preserving reload means the `AtomicReference<Settings>` indirection can go.
-- [ ] **T2.5** Drop `configurate-yaml` from `realty-paper` and its shadowJar relocations **only if** nothing else needs it (`plugin-infrastructure`'s `MessageContainer` does — resolved in Phase 3).
+- [x] **T2.1** `DatabaseSettings`, `Settings`, `TaxSettings` → `@ConfigurationComponent` (flat; needs no T0.3 features).
+- [x] **T2.2** `RegionProfileSettings` / `GroupedRegionProfile` / `RegionProfile` → nested components (needs T0.3).
+- [x] **T2.3** `RegionTagSettings` / `ConfigRegionTag` / `TagPermission` → list-of-components; keep runtime Bukkit permission registration and the orphaned-tag warning.
+- [x] **T2.4** `/realty reload` → `ConfigurationLoader.reload()`, then re-register tag permissions and re-run `ProfileApplicator.applyAll(...)`. Identity-preserving reload means the `AtomicReference<Settings>` indirection can go.
+- [~] **T2.5** Configurate is gone from `realty-backend` and `realty-paper-api`. It remains in `realty-paper` for `messages.yml` alone, and goes with Phase 3.
 
 ## Phase 3 — Messages
 
