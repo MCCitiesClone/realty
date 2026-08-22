@@ -35,8 +35,13 @@ import org.jetbrains.annotations.NotNull;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import java.util.logging.Logger;
 
 public class MariaDatabase implements Database {
@@ -45,10 +50,13 @@ public class MariaDatabase implements Database {
     private final PooledDataSource dataSource;
     private final SqlSessionFactory sessionFactory;
     private final Logger logger;
+    /** Resolved once so migration and the pool agree on which time-zone pinning the server accepts. */
+    private final String jdbcUrl;
 
     public MariaDatabase(@NotNull DatabaseSettings settings, @NotNull Logger logger) {
         this.settings = settings;
-        this.dataSource = new PooledDataSource("org.mariadb.jdbc.Driver", jdbcUrl(settings), settings.username(), settings.password());
+        this.jdbcUrl = resolveJdbcUrl(settings, logger);
+        this.dataSource = new PooledDataSource("org.mariadb.jdbc.Driver", this.jdbcUrl, settings.username(), settings.password());
         this.dataSource.setPoolPingEnabled(true);
         this.dataSource.setPoolPingQuery("SELECT 1");
         this.dataSource.setPoolPingConnectionsNotUsedFor(600000);
@@ -57,7 +65,7 @@ public class MariaDatabase implements Database {
     }
 
     /**
-     * Builds the JDBC URL, pinning the connection's time zone to the JVM's default.
+     * Pins the connection's time zone to the JVM's default, degrading to a form the server accepts.
      *
      * <p>The codebase writes {@link java.time.LocalDateTime} values produced by the JVM into
      * {@code DATETIME} columns and compares them in SQL against {@code NOW()}. If the database
@@ -67,19 +75,77 @@ public class MariaDatabase implements Database {
      * the driver set the session {@code time_zone} to the JVM default, so {@code NOW()} agrees
      * with {@code LocalDateTime.now()}.
      *
-     * <p>An explicit {@code connectionTimeZone} in the configured URL is left untouched.
+     * <p>That form names the zone ({@code SET time_zone = 'America/New_York'}), which a server only
+     * understands once its {@code mysql.time_zone*} tables have been populated by
+     * {@code mysql_tzinfo_to_sql}. On a server without them the connection is refused outright with
+     * "Unknown or incorrect time zone", which used to take the whole plugin down at enable. So the
+     * pinning degrades rather than fails: first the zone name, then the JVM's current UTC offset
+     * (which needs no lookup tables), then no pinning at all. A correct clock is worth one extra
+     * connection at startup; being unable to start is not.
+     *
+     * <p>An explicit {@code connectionTimeZone} in the configured URL is the operator's decision and
+     * is left untouched, unprobed.
      *
      * @param settings the database settings holding the configured URL
+     * @param logger   logger for reporting a degraded pinning
      * @return the JDBC URL to connect with
      */
     @NotNull
-    private static String jdbcUrl(@NotNull DatabaseSettings settings) {
-        String url = "jdbc:" + settings.url();
-        if (url.contains("connectionTimeZone=")) {
-            return url;
+    private static String resolveJdbcUrl(@NotNull DatabaseSettings settings, @NotNull Logger logger) {
+        return resolveJdbcUrl(settings, logger, MariaDatabase::canConnect);
+    }
+
+    /**
+     * @param connectivity tests whether a candidate URL can open a connection; injectable so the
+     *                     fallback ladder can be tested without a server
+     */
+    @NotNull
+    static String resolveJdbcUrl(@NotNull DatabaseSettings settings, @NotNull Logger logger,
+                                 @NotNull BiPredicate<String, DatabaseSettings> connectivity) {
+        String base = "jdbc:" + settings.url();
+        if (base.contains("connectionTimeZone=")) {
+            return base;
         }
+        String named = withTimeZone(base, "LOCAL");
+        if (connectivity.test(named, settings)) {
+            return named;
+        }
+        // ZoneOffset renders as "-04:00", or "Z" for UTC, which no server accepts as a time zone.
+        String offset = ZoneId.systemDefault().getRules().getOffset(Instant.now()).getId();
+        String offsetUrl = withTimeZone(base, offset.equals("Z") ? "+00:00" : offset);
+        if (connectivity.test(offsetUrl, settings)) {
+            logger.warning("The database does not recognise the time zone name '"
+                    + ZoneId.systemDefault() + "'; pinning connections to the fixed offset " + offset
+                    + " instead. Deadlines stay correct until this offset changes — restart after a"
+                    + " daylight-saving transition, or load the server's time zone tables with"
+                    + " mysql_tzinfo_to_sql to have the zone tracked properly.");
+            return offsetUrl;
+        }
+        logger.warning("Could not pin the database connection's time zone; falling back to the URL"
+                + " as configured. If the database server's time zone differs from this server's ("
+                + ZoneId.systemDefault() + "), lease expiry, terminations and payment deadlines will"
+                + " fire at the wrong time. Set the two to the same zone, or add connectionTimeZone"
+                + " to the configured URL.");
+        return base;
+    }
+
+    @NotNull
+    private static String withTimeZone(@NotNull String url, @NotNull String zone) {
         String separator = url.contains("?") ? "&" : "?";
-        return url + separator + "connectionTimeZone=LOCAL&forceConnectionTimeZoneToSession=true";
+        return url + separator + "connectionTimeZone=" + zone + "&forceConnectionTimeZoneToSession=true";
+    }
+
+    /**
+     * Opens and immediately closes a connection, reporting only whether it succeeded. A failure for
+     * any other reason (host down, bad credentials) also returns false, which just means the ladder
+     * runs to the end and the real error surfaces from the migration that follows.
+     */
+    private static boolean canConnect(@NotNull String url, @NotNull DatabaseSettings settings) {
+        try (Connection ignored = DriverManager.getConnection(url, settings.username(), settings.password())) {
+            return true;
+        } catch (SQLException ex) {
+            return false;
+        }
     }
 
     @Override
@@ -116,7 +182,7 @@ public class MariaDatabase implements Database {
 
     @Override
     public void initializeSchema(@NotNull Path schemaFilesDirectory) throws IOException, SQLException {
-        MariaSchemaMigrator.migrate(jdbcUrl(this.settings), this.settings.username(), this.settings.password(),
+        MariaSchemaMigrator.migrate(this.jdbcUrl, this.settings.username(), this.settings.password(),
                 schemaFilesDirectory, MariaSchemaMigrator.defaultMigrations(), this.logger);
     }
 
