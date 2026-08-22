@@ -89,6 +89,7 @@ import io.github.md5sha256.realty.settings.RegionTagSettings;
 import io.github.md5sha256.realty.settings.Settings;
 import io.github.md5sha256.realty.settings.TaxSettings;
 import io.github.md5sha256.realty.util.SquirrelIdUsernameResolver;
+import io.paradaux.hibernia.framework.configurator.ConfigurationLoader;
 import io.paradaux.hibernia.framework.guice.HiberniaModule;
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
@@ -144,6 +145,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class Realty extends JavaPlugin {
 
+    /**
+     * The operator-facing YAML files backing the configuration components. Listed so the
+     * framework merges newly shipped default keys into them on upgrade, which is what the
+     * old hand-rolled loader did on every start.
+     */
+    private static final String[] CONFIG_FILES = {
+            "settings.yml", "database.yml", "profiles.yml", "region-tags.yml", "taxes.yml"
+    };
+
     private final MessageContainer messageContainer = new MessageContainer();
     private final AtomicReference<Settings> settings = new AtomicReference<>();
     private final AtomicReference<RegionProfileSettings> regionFlagSettings = new AtomicReference<>();
@@ -165,6 +175,8 @@ public final class Realty extends JavaPlugin {
     private ModuleLifecycleManager<Realty> moduleManager;
     private SubregionWand subregionWand;
     private SubregionWandManager subregionWandManager;
+    private HiberniaModule hibernia;
+    private ConfigurationLoader configuration;
     private Injector injector;
     private boolean failedLoad = false;
 
@@ -233,11 +245,20 @@ public final class Realty extends JavaPlugin {
             copyResourceTemplate("profiles.yml", "defaults/default-profiles.yml");
             copyResourceTemplate("taxes.yml", "defaults/default-taxes.yml");
             reloadMessages();
-            this.databaseSettings = loadDatabaseSettings();
-            this.settings.set(loadSettings());
-            this.regionFlagSettings.set(loadRegionFlagSettings());
-            this.realtyTags.set(new RealtyTags(loadRegionTagSettings()));
-            this.taxSettings.set(loadTaxSettings());
+            // Built during onLoad, not onEnable: the database settings decide whether the plugin
+            // may enable at all, and the profile and tag settings are needed before the first
+            // region is touched. The injector itself comes later, once the services exist.
+            this.hibernia = HiberniaModule.forPlugin(this)
+                    .scanConfiguration("io.github.md5sha256.realty.settings")
+                    .scanConfiguration("io.github.md5sha256.realty")
+                    .reconcileFiles(CONFIG_FILES)
+                    .withoutMessages()
+                    .build();
+            this.databaseSettings = this.hibernia.configuration(DatabaseSettings.class);
+            this.settings.set(this.hibernia.configuration(Settings.class));
+            this.regionFlagSettings.set(this.hibernia.configuration(RegionProfileSettings.class));
+            this.realtyTags.set(new RealtyTags(this.hibernia.configuration(RegionTagSettings.class)));
+            this.taxSettings.set(this.hibernia.configuration(TaxSettings.class));
             registerTagPermissions(this.realtyTags.get());
             configureRegionFlagService(this.regionFlagSettings.get());
 
@@ -397,17 +418,12 @@ public final class Realty extends JavaPlugin {
      * Builds the Guice injector over the service graph {@link #onEnable()} has just finished
      * constructing.
      *
-     * <p>{@code withoutMessages()} for now: Realty still renders through its own
-     * {@link MessageContainer} over {@code messages.yml}, and Hibernia's {@code Message} bean
-     * eagerly loads a {@code messages.properties} that does not exist yet. Configuration
-     * scanning is likewise deferred — the settings classes are still Configurate-bound.</p>
+     * <p>The Hibernia module itself was built in {@link #onLoad()}, because configuration has to
+     * be readable before the plugin decides whether it can enable.</p>
      */
     private @NotNull Injector createInjector(@NotNull EconomyProvider economyProvider,
                                              @NotNull SafeLocationFinder safeLocationFinder) {
-        HiberniaModule hibernia = HiberniaModule.forPlugin(this)
-                .withoutMessages()
-                .build();
-        return Guice.createInjector(hibernia, new RealtyModule(
+        Injector created = Guice.createInjector(this.hibernia, new RealtyModule(
                 this,
                 this.messageContainer,
                 this.settings,
@@ -429,6 +445,8 @@ public final class Realty extends JavaPlugin {
                 safeLocationFinder,
                 this.subregionWand,
                 this.subregionWandManager));
+        this.configuration = created.getInstance(ConfigurationLoader.class);
+        return created;
     }
 
     private void registerTreasuryTaxProvider() {
@@ -652,30 +670,10 @@ public final class Realty extends JavaPlugin {
         }
     }
 
-    private Settings loadSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("settings");
-        return settingsRoot.get(Settings.class);
-    }
 
-    private DatabaseSettings loadDatabaseSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("database");
-        return settingsRoot.get(DatabaseSettings.class);
-    }
 
-    private RegionProfileSettings loadRegionFlagSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("profiles");
-        return settingsRoot.get(RegionProfileSettings.class);
-    }
 
-    private RegionTagSettings loadRegionTagSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("region-tags");
-        return settingsRoot.get(RegionTagSettings.class);
-    }
 
-    private TaxSettings loadTaxSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("taxes");
-        return settingsRoot.get(TaxSettings.class);
-    }
 
     private void unregisterTagPermissions(@NotNull RealtyTags realtyTags) {
         PluginManager pluginManager = getServer().getPluginManager();
@@ -764,14 +762,19 @@ public final class Realty extends JavaPlugin {
     }
 
     private void performReload() throws IOException {
-        this.settings.set(loadSettings());
-        this.regionFlagSettings.set(loadRegionFlagSettings());
+        // One re-read of every file, then a single atomic swap of the whole component set, so a
+        // command running mid-reload never sees settings from one file paired with tags from
+        // another. The AtomicReferences below are re-pointed at the new snapshot; consumers hold
+        // the holder, not the value, so they pick the new values up without being re-injected.
+        this.configuration.reload();
+        this.settings.set(this.configuration.getComponent(Settings.class));
+        this.regionFlagSettings.set(this.configuration.getComponent(RegionProfileSettings.class));
         unregisterTagPermissions(this.realtyTags.get());
-        this.realtyTags.set(new RealtyTags(loadRegionTagSettings()));
+        this.realtyTags.set(new RealtyTags(this.configuration.getComponent(RegionTagSettings.class)));
         registerTagPermissions(this.realtyTags.get());
         configureRegionFlagService(this.regionFlagSettings.get());
         this.profileApplicator.applyAll(this.settings.get().profileReapplyPerTick());
-        this.taxSettings.set(loadTaxSettings());
+        this.taxSettings.set(this.configuration.getComponent(TaxSettings.class));
         this.partyService.refresh();
         reloadMessages();
         warnOrphanedTags();

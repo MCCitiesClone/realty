@@ -1,17 +1,24 @@
 package io.github.md5sha256.realty.api;
 
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationObject;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Required;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
 import java.util.List;
 
-@ConfigSerializable
+/**
+ * The sign template attached to a region profile: the lines rendered on the sign, and the
+ * commands run as the clicking player.
+ */
+@ConfigurationObject
 public record SignProfile(
-        @Setting("lines") @Required @NotNull List<String> lines,
-        @Setting("right-click-commands") @Nullable List<String> rightClickCommands,
-        @Setting("left-click-commands") @Nullable List<String> leftClickCommands
+        @ConfigurationValue(path = "lines") @NotNull List<String> lines,
+        @ConfigurationValue(path = "right-click-commands") @Nullable List<String> rightClickCommands,
+        @ConfigurationValue(path = "left-click-commands") @Nullable List<String> leftClickCommands
 ) {
+
+    public SignProfile {
+        lines = lines == null ? List.of() : List.copyOf(lines);
+    }
 }

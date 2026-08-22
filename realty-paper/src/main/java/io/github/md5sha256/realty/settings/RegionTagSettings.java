@@ -1,16 +1,16 @@
 package io.github.md5sha256.realty.settings;
 
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationComponent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
 import java.util.List;
 import java.util.Objects;
 
-@ConfigSerializable
+@ConfigurationComponent(file = "region-tags.yml")
 public record RegionTagSettings(
-        @Setting("tags") @NotNull List<ConfigRegionTag> tags
+        @ConfigurationValue(path = "tags") @NotNull List<ConfigRegionTag> tags
 ) {
     public RegionTagSettings(@Nullable List<ConfigRegionTag> tags) {
         this.tags = Objects.requireNonNullElse(tags, List.of());

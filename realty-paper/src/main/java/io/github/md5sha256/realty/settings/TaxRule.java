@@ -1,9 +1,9 @@
 package io.github.md5sha256.realty.settings;
 
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
 /**
  * A single property-tax rule: a {@link TagMatch} predicate plus the formula
@@ -11,10 +11,10 @@ import org.spongepowered.configurate.objectmapping.meta.Setting;
  * {@code <plots>}) applied to regions it matches. Rules are evaluated top-to-
  * bottom and the first match wins.
  */
-@ConfigSerializable
+@ConfigurationObject
 public record TaxRule(
-        @Setting("match") @Nullable TagMatch match,
-        @Setting("formula") @Nullable String formula
+        @ConfigurationValue(path = "match") @Nullable TagMatch match,
+        @ConfigurationValue(path = "formula") @Nullable String formula
 ) {
 
     public TaxRule {

@@ -6,7 +6,9 @@ plugins {
 dependencies {
     api(project(":realty-backend-api"))
     compileOnly("org.jetbrains:annotations:26.0.2-1")
-    api("org.spongepowered:configurate-yaml:4.2.0")
+    // Only for the annotations on DatabaseSettings; compileOnly because the shaded
+    // plugin supplies (and relocates) the framework at runtime.
+    compileOnly("io.paradaux:hibernia-framework:1.2.0-realty-SNAPSHOT")
     api("org.mybatis:mybatis:3.5.19")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.6")
 

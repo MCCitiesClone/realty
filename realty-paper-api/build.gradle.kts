@@ -10,7 +10,9 @@ dependencies {
         exclude(group = "org.bukkit", module = "bukkit")
     }
     compileOnlyApi("org.jetbrains:annotations:26.0.2-1")
-    api("org.spongepowered:configurate-yaml:4.2.0")
+    // Only for the annotations on SignProfile; compileOnly because the shaded plugin
+    // supplies (and relocates) the framework at runtime.
+    compileOnly("io.paradaux:hibernia-framework:1.2.0-realty-SNAPSHOT")
     testImplementation("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
 }
 

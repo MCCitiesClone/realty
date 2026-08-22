@@ -1,16 +1,15 @@
 package io.github.md5sha256.realty.settings;
 
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationObject;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Required;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
-@ConfigSerializable
+@ConfigurationObject
 public record ConfigRegionTag(
-        @Setting("tag-id") @Required @NotNull String tagId,
-        @Setting("tag-display-name") @Required @NotNull Component tagDisplayName,
-        @Setting("permission") @Nullable TagPermission permission
+        @ConfigurationValue(path = "tag-id") @NotNull String tagId,
+        @ConfigurationValue(path = "tag-display-name") @NotNull Component tagDisplayName,
+        @ConfigurationValue(path = "permission") @Nullable TagPermission permission
 ) {
 }

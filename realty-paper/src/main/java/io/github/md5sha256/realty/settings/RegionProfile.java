@@ -1,17 +1,16 @@
 package io.github.md5sha256.realty.settings;
 
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationObject;
 import io.github.md5sha256.realty.api.SignProfile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Required;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
 import java.util.Map;
 
-@ConfigSerializable
+@ConfigurationObject
 public record RegionProfile(
-        @Setting("priority") @Nullable Integer priority,
-        @Setting("flags") @Required @NotNull Map<String, String> flags,
-        @Setting("sign") @Nullable SignProfile sign) {
+        @ConfigurationValue(path = "priority") @Nullable Integer priority,
+        @ConfigurationValue(path = "flags") @NotNull Map<String, String> flags,
+        @ConfigurationValue(path = "sign") @Nullable SignProfile sign) {
 }
