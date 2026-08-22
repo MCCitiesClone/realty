@@ -9,14 +9,18 @@ import io.github.md5sha256.realty.command.handler.ExtendCommand;
 import io.github.md5sha256.realty.command.handler.GovernmentCommands;
 import io.github.md5sha256.realty.command.handler.HistoryCommand;
 import io.github.md5sha256.realty.command.handler.InfoCommand;
+import io.github.md5sha256.realty.command.handler.ModifyCommands;
 import io.github.md5sha256.realty.command.handler.ModuleCommands;
 import io.github.md5sha256.realty.command.handler.ReloadCommand;
 import io.github.md5sha256.realty.command.handler.RemoveCommand;
 import io.github.md5sha256.realty.command.handler.RentCommand;
 import io.github.md5sha256.realty.command.handler.RentableCommand;
+import io.github.md5sha256.realty.command.handler.SetCommands;
+import io.github.md5sha256.realty.command.handler.SignCommands;
 import io.github.md5sha256.realty.command.handler.SubregionCommands;
 import io.github.md5sha256.realty.command.handler.TagCommands;
 import io.github.md5sha256.realty.command.handler.TeleportCommand;
+import io.github.md5sha256.realty.command.handler.TerminateCommands;
 import io.github.md5sha256.realty.command.handler.TransferCommand;
 import io.github.md5sha256.realty.command.handler.UnrentCommand;
 import io.github.md5sha256.realty.command.handler.UnsetCommands;
@@ -64,7 +68,8 @@ public final class RealtyCommands {
             ModuleCommands.class,
             SubregionCommands.class,
             TagCommands.class,
-            UnsetCommands.class);
+            UnsetCommands.class,
+            ModifyCommands.class);
 
     /** Every custom argument resolver. Enums need none — the framework synthesises those. */
     public static final @NotNull List<Class<? extends ParameterResolver<?>>> RESOLVERS = List.of(
