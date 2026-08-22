@@ -24,6 +24,8 @@ import io.github.md5sha256.realty.api.ExecutorState;
 import io.github.md5sha256.realty.command.util.SafeLocationFinder;
 import io.github.md5sha256.realty.economy.EconomyProvider;
 import io.github.md5sha256.realty.economy.PaymentResult;
+import io.github.md5sha256.realty.party.PartyDomains;
+import io.github.md5sha256.realty.party.RegionParties;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -53,6 +55,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
     private final SignCache signCache;
     private final java.util.function.LongSupplier terminationNoticeSeconds;
     private final SafeLocationFinder safeLocationFinder;
+    private final RegionParties parties;
 
     /**
      * Per-region serialisation chains. Each entry is the tail of a queue of
@@ -71,6 +74,26 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
                               @NotNull SignCache signCache,
                               @NotNull java.util.function.LongSupplier terminationNoticeSeconds,
                               @NotNull SafeLocationFinder safeLocationFinder) {
+        this(realtyApi, economyProvider, executorState, database, regionProfileService,
+                signTextApplicator, signCache, terminationNoticeSeconds, safeLocationFinder,
+                RegionParties.PLAYERS_ONLY);
+    }
+
+    /**
+     * @param parties resolves parties that may not be players — who may act as one, and which
+     *                players hold its regions in WorldGuard
+     */
+    public RealtyPaperApiImpl(@NotNull RealtyBackend realtyApi,
+                              @NotNull EconomyProvider economyProvider,
+                              @NotNull ExecutorState executorState,
+                              @NotNull Database database,
+                              @NotNull RegionProfileService regionProfileService,
+                              @NotNull SignTextApplicator signTextApplicator,
+                              @NotNull SignCache signCache,
+                              @NotNull java.util.function.LongSupplier terminationNoticeSeconds,
+                              @NotNull SafeLocationFinder safeLocationFinder,
+                              @NotNull RegionParties parties) {
+        this.parties = parties;
         this.realtyApi = realtyApi;
         this.economyProvider = economyProvider;
         this.executorState = executorState;
@@ -198,8 +221,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
             }
         }
         ProtectedRegion protectedRegion = region.region();
-        protectedRegion.getOwners().clear();
-        protectedRegion.getOwners().addPlayer(buyerId);
+        PartyDomains.setOwners(protectedRegion, parties, buyerId);
         protectedRegion.getMembers().clear();
         regionProfileService.applyFlags(region, RegionState.SOLD, placeholders);
         signTextApplicator.updateLoadedSigns(region.world(), regionId,
@@ -272,9 +294,8 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
             }
         }
         ProtectedRegion protectedRegion = region.region();
-        protectedRegion.getOwners().clear();
         protectedRegion.getMembers().clear();
-        protectedRegion.getOwners().addPlayer(tenantId);
+        PartyDomains.setOwners(protectedRegion, parties, tenantId);
         regionProfileService.applyFlags(region, RegionState.LEASED, placeholders);
         signTextApplicator.updateLoadedSigns(region.world(), regionId,
                 RegionState.LEASED, placeholders);
@@ -506,9 +527,9 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
         }
         // Derive the initiating role; an admin (bypass) acts as the landlord (no charge).
         String role;
-        if (actorId.equals(lease.tenantId())) {
+        if (parties.actsForNullable(actorId, lease.tenantId())) {
             role = LeaseholdRoles.TENANT;
-        } else if (actorId.equals(lease.landlordId()) || bypassAuth) {
+        } else if (parties.actsFor(actorId, lease.landlordId()) || bypassAuth) {
             role = LeaseholdRoles.LANDLORD;
         } else {
             return TerminationPlan.fail(new TerminateResult.NotAuthorized(regionId));
@@ -608,8 +629,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
         // Money has cleared — now (and only now) commit the ownership transfer.
         realtyApi.finalizeBidPurchase(regionId, worldId, bidderId);
         ProtectedRegion protectedRegion = region.region();
-        protectedRegion.getOwners().clear();
-        protectedRegion.getOwners().addPlayer(bidderId);
+        PartyDomains.setOwners(protectedRegion, parties, bidderId);
         protectedRegion.getMembers().clear();
         Map<String, String> placeholders = realtyApi.getRegionPlaceholders(regionId, worldId);
         regionProfileService.applyFlags(region, RegionState.SOLD, placeholders);
@@ -701,8 +721,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
         // Money has cleared — now (and only now) commit the ownership transfer.
         realtyApi.finalizeOfferPurchase(regionId, worldId, offererId);
         ProtectedRegion protectedRegion = region.region();
-        protectedRegion.getOwners().clear();
-        protectedRegion.getOwners().addPlayer(offererId);
+        PartyDomains.setOwners(protectedRegion, parties, offererId);
         protectedRegion.getMembers().clear();
         Map<String, String> placeholders = realtyApi.getRegionPlaceholders(regionId, worldId);
         regionProfileService.applyFlags(region, RegionState.SOLD, placeholders);
@@ -741,7 +760,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
                 protectedRegion.getMembers().clear();
                 RegionState state;
                 if (titleHolderId != null) {
-                    protectedRegion.getOwners().addPlayer(titleHolderId);
+                    PartyDomains.addOwners(protectedRegion, parties, titleHolderId);
                     state = RegionState.SOLD;
                     updateChildLandlords(regionId, region.world(), titleHolderId);
                 } else {
@@ -782,7 +801,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
                 protectedRegion.getMembers().clear();
                 RegionState state;
                 if (titleHolderId != null) {
-                    protectedRegion.getOwners().addPlayer(titleHolderId);
+                    PartyDomains.addOwners(protectedRegion, parties, titleHolderId);
                     state = RegionState.SOLD;
                     updateChildLandlords(regionId, region.world(), titleHolderId);
                 } else {
@@ -823,7 +842,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
                 protectedRegion.getMembers().clear();
                 RegionState state;
                 if (tenantId != null) {
-                    protectedRegion.getOwners().addPlayer(tenantId);
+                    PartyDomains.addOwners(protectedRegion, parties, tenantId);
                     state = RegionState.LEASED;
                 } else {
                     state = RegionState.FOR_LEASE;
@@ -923,7 +942,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
             return Map.entry(created, placeholders);
         }, executorState.dbExec()).thenApplyAsync(entry -> {
             if (entry.getKey()) {
-                region.region().getMembers().addPlayer(authority);
+                PartyDomains.addMembers(region.region(), parties, authority);
                 regionProfileService.applyFlags(region,
                         titleHolder != null ? RegionState.SOLD : RegionState.FOR_SALE,
                         entry.getValue());
@@ -1019,7 +1038,7 @@ public class RealtyPaperApiImpl implements RealtyPaperApi {
                 if (regionManager != null) {
                     regionManager.addRegion(childRegion);
                 }
-                childRegion.getOwners().addPlayer(landlordId);
+                PartyDomains.addOwners(childRegion, parties, landlordId);
                 WorldGuardRegion childWgRegion = new WorldGuardRegion(childRegion, parentRegion.world());
                 regionProfileService.applyFlags(childWgRegion, RegionState.FOR_LEASE, placeholders);
             }

@@ -49,7 +49,11 @@ jobs:
       - name: Build
         run: |
           chmod +x ./gradlew
-          ./gradlew shadowJar
+          # realty-areashop-importer is excluded: its only dependency, the archived
+          # md5sha256/AreaShop fork, is no longer resolvable through JitPack. It is a one-off
+          # AreaShop -> Realty migration tool that is no longer shipped; build it locally with a
+          # copy of the AreaShop jar if it is ever needed again.
+          ./gradlew shadowJar -x :realty-areashop-importer:shadowJar
 
       - name: Collect JARs
         run: |

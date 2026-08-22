@@ -13,12 +13,12 @@ import io.github.md5sha256.realty.command.util.ParseBounds;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.entity.LeaseholdModificationView;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
+import io.github.md5sha256.realty.party.PartyNames;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
@@ -51,7 +51,8 @@ import java.util.UUID;
 public record ModifyCommandGroup(
         @NotNull RealtyPaperApi api,
         @NotNull MessageContainer messages,
-        @NotNull RealtyEventDispatch events
+        @NotNull RealtyEventDispatch events,
+        @NotNull PartyService parties
 ) implements CustomCommandBean {
 
     @Override
@@ -154,10 +155,8 @@ public record ModifyCommandGroup(
                 view.newPrice(), view.newDurationSeconds(), view.newMaxExtensions());
     }
 
-    private static @NotNull String resolveName(@NotNull UUID uuid) {
-        OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-        String name = player.getName();
-        return name != null ? name : uuid.toString();
+    private @NotNull String resolveName(@NotNull UUID uuid) {
+        return PartyNames.resolve(parties, uuid);
     }
 
     /** The three ways to resolve a pending proposal, each carrying its success message and resolution name. */

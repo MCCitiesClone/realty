@@ -4,6 +4,7 @@ import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.api.event.RegionCreateEvent;
 import io.github.md5sha256.realty.api.event.RegionCreatedEvent;
 import io.github.md5sha256.realty.command.util.AuthorityParser;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.command.util.DurationParser;
 import io.github.md5sha256.realty.command.util.ParseBounds;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
@@ -38,30 +39,27 @@ import java.util.concurrent.atomic.AtomicReference;
 public record RegisterCommand(@NotNull RealtyPaperApi api,
                               @NotNull AtomicReference<Settings> settings,
                               @NotNull MessageContainer messages,
-                              @NotNull RealtyEventDispatch events) implements CustomCommandBean {
+                              @NotNull RealtyEventDispatch events,
+                              @NotNull PartyService parties) implements CustomCommandBean {
 
     private static final CloudKey<Double> PRICE = CloudKey.of("price", Double.class);
     private static final CloudKey<Duration> PERIOD = CloudKey.of("period", Duration.class);
     private static final CloudKey<Integer> MAX_EXTENSIONS = CloudKey.of("maxrenewals", Integer.class);
-    private static final CommandFlag<UUID> AUTHORITY_FLAG =
-            CommandFlag.<Source>builder("authority")
-                    .withComponent(AuthorityParser.authority())
-                    .build();
+    // Built per registration rather than held as constants — see CreateCommand.
+    private static final String AUTHORITY_FLAG = "authority";
+    private static final String TITLEHOLDER_FLAG = "titleholder";
+    private static final String LANDLORD_FLAG = "landlord";
 
-    private static final CommandFlag<UUID> TITLEHOLDER_FLAG =
-            CommandFlag.<Source>builder("titleholder")
-                    .withComponent(AuthorityParser.authority())
-                    .build();
+    private @NotNull CommandFlag<UUID> partyFlag(@NotNull String name) {
+        return CommandFlag.<Source>builder(name)
+                .withComponent(AuthorityParser.party(parties))
+                .build();
+    }
 
     private static final CommandFlag<Double> PRICE_FLAG =
             CommandFlag.<Source>builder("price")
                     .withComponent(DoubleParser.doubleParser(ParseBounds.MIN_STRICTLY_POSITIVE,
                             Double.MAX_VALUE))
-                    .build();
-
-    private static final CommandFlag<UUID> LANDLORD_FLAG =
-            CommandFlag.<Source>builder("landlord")
-                    .withComponent(AuthorityParser.authority())
                     .build();
 
 
@@ -76,15 +74,15 @@ public record RegisterCommand(@NotNull RealtyPaperApi api,
                                 Double.MAX_VALUE))
                         .required(PERIOD, DurationParser.duration())
                         .required(MAX_EXTENSIONS, IntegerParser.integerParser(-1))
-                        .flag(LANDLORD_FLAG)
+                        .flag(partyFlag(LANDLORD_FLAG))
                         .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                         .handler(this::executeLeasehold)
                         .build(),
                 base.literal("freehold")
                         .permission("realty.command.register.freehold")
                         .flag(PRICE_FLAG)
-                        .flag(TITLEHOLDER_FLAG)
-                        .flag(AUTHORITY_FLAG)
+                        .flag(partyFlag(TITLEHOLDER_FLAG))
+                        .flag(partyFlag(AUTHORITY_FLAG))
                         .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                         .handler(this::executeFreehold)
                         .build()

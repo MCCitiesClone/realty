@@ -6,18 +6,19 @@ import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.HistoryEventType;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.command.util.AuthorityParser;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.command.util.DurationParser;
 import io.github.md5sha256.realty.command.util.LeaseholdChangeSummary;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.entity.HistoryEntry;
+import io.github.md5sha256.realty.party.PartyNames;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.Settings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -43,7 +44,8 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public record HistoryCommand(@NotNull RealtyPaperApi api,
                               @NotNull AtomicReference<Settings> settings,
-                              @NotNull MessageContainer messages) implements CustomCommandBean.Single {
+                              @NotNull MessageContainer messages,
+                              @NotNull PartyService parties) implements CustomCommandBean.Single {
 
     private static final int PAGE_SIZE = 10;
 
@@ -83,10 +85,14 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                     .withComponent(DurationParser.duration())
                     .build();
 
-    private static final CommandFlag<UUID> PLAYER_FLAG =
-            CommandFlag.<Source>builder("player")
-                    .withComponent(AuthorityParser.authority())
-                    .build();
+    // Built per registration rather than held as a constant — see CreateCommand.
+    private static final String PLAYER_FLAG = "player";
+
+    private @NotNull CommandFlag<UUID> playerFlag() {
+        return CommandFlag.<Source>builder(PLAYER_FLAG)
+                .withComponent(AuthorityParser.party(parties))
+                .build();
+    }
 
     private static final CommandFlag<Integer> PAGE_FLAG =
             CommandFlag.<Source>builder("page")
@@ -101,7 +107,7 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
                 .optional("region", WorldGuardRegionResolver.worldGuardRegionResolver())
                 .flag(EVENT_FLAG)
                 .flag(TIME_FLAG)
-                .flag(PLAYER_FLAG)
+                .flag(playerFlag())
                 .flag(PAGE_FLAG)
                 .handler(this::execute)
                 .build();
@@ -255,9 +261,8 @@ public record HistoryCommand(@NotNull RealtyPaperApi api,
         return LEASEHOLD_EVENT_MESSAGE_KEYS.getOrDefault(eventType, resolveEventMessageKey(eventType));
     }
 
-    private static @NotNull String resolveName(@NotNull UUID uuid) {
-        String name = Bukkit.getOfflinePlayer(uuid).getName();
-        return name != null ? name : uuid.toString();
+    private @NotNull String resolveName(@NotNull UUID uuid) {
+        return PartyNames.resolve(parties, uuid);
     }
 
 }

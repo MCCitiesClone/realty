@@ -38,6 +38,7 @@ import io.github.md5sha256.realty.command.CreateCommand;
 import io.github.md5sha256.realty.command.CustomCommandBean;
 import io.github.md5sha256.realty.command.DeleteCommand;
 import io.github.md5sha256.realty.command.ExtendCommand;
+import io.github.md5sha256.realty.command.GovernmentCommandGroup;
 import io.github.md5sha256.realty.command.HelpCommand;
 import io.github.md5sha256.realty.command.HistoryCommand;
 import io.github.md5sha256.realty.command.InfoCommand;
@@ -90,6 +91,9 @@ import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import io.github.md5sha256.realty.economy.EconomyProvider;
+import io.github.md5sha256.realty.economy.GovernmentAccountLookup;
+import io.github.md5sha256.realty.party.PartyDomains;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.economy.TreasuryEconomyProvider;
 import io.github.md5sha256.realty.economy.VaultEconomyProvider;
 import net.milkbowl.vault.economy.Economy;
@@ -145,6 +149,7 @@ public final class Realty extends JavaPlugin {
     private final RegionProfileService regionProfileService = new RegionProfileService(getLogger());
     private final SignCache signCache = new SignCache();
     private EconomyProvider economyProvider;
+    private PartyService partyService;
     private SquirrelIdUsernameResolver nameResolver;
     private ExecutorState executorState;
     private RealtyBackend logic;
@@ -267,10 +272,18 @@ public final class Realty extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+        // Resolved before the backend so both it and the economy providers can be given the same
+        // view of which party UUIDs stand for a government. The service reads the backend through
+        // a supplier because the backend takes it as its PartyAuthorizer — one of the two has to
+        // be late-bound.
+        this.partyService = new PartyService(() -> this.logic, resolveTreasuryApi(),
+                this.nameResolver::getUsername, getLogger());
         this.logic = new RealtyBackendImpl(mariaDatabase,
-                this.nameResolver::getUsername,
+                this.partyService::displayName,
                 dateTime -> DateFormatter.format(this.settings.get().dateFormat(), dateTime),
-                () -> this.settings.get().offerPaymentDurationSeconds());
+                () -> this.settings.get().offerPaymentDurationSeconds(),
+                this.partyService);
+        this.partyService.refresh();
         EconomyProvider economyProvider = resolveEconomyProvider();
         this.economyProvider = economyProvider;
         if (economyProvider == null) {
@@ -295,7 +308,8 @@ public final class Realty extends JavaPlugin {
         this.paperApi = new RealtyPaperApiImpl(
                 this.logic, economyProvider, this.executorState, this.database,
                 this.regionProfileService, this.signTextApplicator, this.signCache,
-                () -> this.settings.get().terminationNoticeSeconds(), safeLocationFinder);
+                () -> this.settings.get().terminationNoticeSeconds(), safeLocationFinder,
+                this.partyService);
         this.eventDispatch = new RealtyEventDispatch(
                 getServer(),
                 this.executorState.mainThreadExec(),
@@ -367,20 +381,33 @@ public final class Realty extends JavaPlugin {
         }
     }
 
+    /**
+     * Returns Treasury's API, or {@code null} when Treasury is absent. Governments are a Treasury
+     * concept: without it they can neither be registered nor authorized nor paid.
+     */
+    private @Nullable io.paradaux.treasury.api.TreasuryApi resolveTreasuryApi() {
+        if (!getServer().getPluginManager().isPluginEnabled("Treasury")) {
+            return null;
+        }
+        var registration = getServer().getServicesManager()
+                .getRegistration(io.paradaux.treasury.api.TreasuryApi.class);
+        return registration != null ? registration.getProvider() : null;
+    }
+
     private @Nullable EconomyProvider resolveEconomyProvider() {
+        GovernmentAccountLookup governmentAccounts = this.partyService::accountId;
+        io.paradaux.treasury.api.TreasuryApi treasuryApi = resolveTreasuryApi();
+        if (treasuryApi != null) {
+            getLogger().info("Detected Treasury, using Treasury as the economy provider (full ledger support)");
+            return new TreasuryEconomyProvider(treasuryApi, governmentAccounts);
+        }
         if (getServer().getPluginManager().isPluginEnabled("Treasury")) {
-            var registration = getServer().getServicesManager()
-                    .getRegistration(io.paradaux.treasury.api.TreasuryApi.class);
-            if (registration != null) {
-                getLogger().info("Detected Treasury, using Treasury as the economy provider (full ledger support)");
-                return new TreasuryEconomyProvider(registration.getProvider());
-            }
             getLogger().warning("Treasury plugin is loaded but TreasuryApi service is not registered; falling back to Vault");
         }
         var registration = getServer().getServicesManager().getRegistration(Economy.class);
         if (registration != null) {
             getLogger().info("Using Vault as the economy provider");
-            return new VaultEconomyProvider(registration.getProvider());
+            return new VaultEconomyProvider(registration.getProvider(), governmentAccounts);
         }
         return null;
     }
@@ -467,7 +494,8 @@ public final class Realty extends JavaPlugin {
                             if (regionManager != null) {
                                 ProtectedRegion protectedRegion = regionManager.getRegion(expired.worldGuardRegionId());
                                 if (protectedRegion != null) {
-                                    protectedRegion.getOwners().removePlayer(expired.tenantId());
+                                    PartyDomains.removeOwners(protectedRegion,
+                                            this.partyService, expired.tenantId());
                                     WorldGuardRegion wgRegion = new WorldGuardRegion(protectedRegion, world);
                                     regionProfileService.applyFlags(
                                             wgRegion,
@@ -508,7 +536,8 @@ public final class Realty extends JavaPlugin {
                             if (regionManager != null) {
                                 ProtectedRegion protectedRegion = regionManager.getRegion(terminated.worldGuardRegionId());
                                 if (protectedRegion != null) {
-                                    protectedRegion.getOwners().removePlayer(terminated.tenantId());
+                                    PartyDomains.removeOwners(protectedRegion,
+                                            this.partyService, terminated.tenantId());
                                     WorldGuardRegion wgRegion = new WorldGuardRegion(protectedRegion, world);
                                     regionProfileService.applyFlags(wgRegion, RegionState.FOR_LEASE,
                                             terminatedPlaceholders.getOrDefault(terminated.worldGuardRegionId(),
@@ -682,6 +711,7 @@ public final class Realty extends JavaPlugin {
         configureRegionFlagService(this.regionFlagSettings.get());
         this.profileApplicator.applyAll(this.settings.get().profileReapplyPerTick());
         this.taxSettings.set(loadTaxSettings());
+        this.partyService.refresh();
         reloadMessages();
         warnOrphanedTags();
         reloadModules();
@@ -764,7 +794,8 @@ public final class Realty extends JavaPlugin {
                 new SubregionWandListener(this, subregionWand, subregionWandManager,
                         messageContainer), this);
         pluginManager.registerEvents(
-                new RegionNotificationListener(this.eventDispatch, messageContainer), this);
+                new RegionNotificationListener(this.eventDispatch, messageContainer,
+                        this.partyService), this);
 
         List<CustomCommandBean> commands = List.of(
                 new VersionCommand(version),
@@ -777,37 +808,44 @@ public final class Realty extends JavaPlugin {
                 new AuctionCommandGroup(paperApi,
                         this.settings,
                         messageContainer,
-                        this.eventDispatch),
+                        this.eventDispatch,
+                        this.partyService),
                 new BuyCommand(paperApi, messageContainer, this.eventDispatch),
-                new CreateCommand(paperApi, this.settings, messageContainer, this.eventDispatch),
-                new RegisterCommand(paperApi, this.settings, messageContainer, this.eventDispatch),
+                new CreateCommand(paperApi, this.settings, messageContainer, this.eventDispatch,
+                        this.partyService),
+                new RegisterCommand(paperApi, this.settings, messageContainer, this.eventDispatch,
+                        this.partyService),
                 new DeleteCommand(paperApi, messageContainer, this.eventDispatch),
-                new HistoryCommand(paperApi, this.settings, messageContainer),
+                new HistoryCommand(paperApi, this.settings, messageContainer, this.partyService),
                 new InfoCommand(paperApi,
                         this.settings,
                         this.database,
                         this.realtyTags,
-                        messageContainer),
-                new ListCommand(paperApi, messageContainer),
+                        messageContainer,
+                        this.partyService),
+                new ListCommand(paperApi, messageContainer, this.partyService),
                 new OfferCommandGroup(paperApi,
                         messageContainer,
-                        this.eventDispatch),
+                        this.eventDispatch,
+                        this.partyService,
+                        executorState),
                 new ExtendCommand(paperApi, messageContainer, this.eventDispatch),
                 new RentCommand(paperApi, messageContainer, this.eventDispatch),
                 new RentableCommand(paperApi, messageContainer),
                 new UnrentCommand(paperApi, messageContainer, this.eventDispatch),
-                new SetCommandGroup(paperApi, messageContainer, this.eventDispatch),
-                new ModifyCommandGroup(paperApi, messageContainer, this.eventDispatch),
+                new SetCommandGroup(paperApi, messageContainer, this.eventDispatch, this.partyService),
+                new ModifyCommandGroup(paperApi, messageContainer, this.eventDispatch, this.partyService),
                 new TerminateCommand(paperApi, messageContainer, this.eventDispatch),
-                new TransferCommand(paperApi, messageContainer, this.eventDispatch),
+                new TransferCommand(paperApi, messageContainer, this.eventDispatch, this.partyService),
                 new UnsetCommandGroup(paperApi, messageContainer),
+                new GovernmentCommandGroup(this.partyService, executorState, messageContainer),
                 new ModuleCommandGroup(this.moduleManager, executorState, messageContainer),
                 new ReloadCommand(executorState, () -> {
                     performReload();
                     return null;
                 }, messageContainer),
                 new RemoveCommand(messageContainer),
-                new SignCommand(paperApi, executorState, messageContainer),
+                new SignCommand(paperApi, executorState, messageContainer, this.partyService),
                 new TeleportCommand(getLogger(), paperApi, this.settings, messageContainer, safeLocationFinder),
                 new SubregionCommandGroup(subregionWand, subregionWandManager, subregionDialog,
                         messageContainer),

@@ -10,6 +10,8 @@ import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.SqlSessionWrapper;
 import io.github.md5sha256.realty.database.entity.FreeholdContractEntity;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
+import io.github.md5sha256.realty.party.PartyNames;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
@@ -18,7 +20,6 @@ import io.github.md5sha256.realty.settings.Settings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
@@ -46,7 +47,8 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
                           @NotNull AtomicReference<Settings> settings,
                           @NotNull Database database,
                           @NotNull AtomicReference<RealtyTags> realtyTags,
-                          @NotNull MessageContainer messages) implements CustomCommandBean.Single {
+                          @NotNull MessageContainer messages,
+                          @NotNull PartyService parties) implements CustomCommandBean.Single {
 
     private static @NotNull String resolveMembers(@NotNull WorldGuardRegion region) {
         Set<UUID> memberUuids = region.region().getMembers().getUniqueIds();
@@ -54,8 +56,10 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
         if (memberUuids.isEmpty() && memberGroups.isEmpty()) {
             return "None";
         }
+        // Always players: a government holding the region is expanded into its members before
+        // it reaches a WorldGuard domain, so there is no party to resolve here.
         String members = memberUuids.stream()
-                .map(InfoCommand::resolveName)
+                .map(PartyNames::playerName)
                 .collect(Collectors.joining(", "));
         String groups = memberGroups.stream()
                 .map(g -> "g:" + g)
@@ -69,9 +73,8 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
         }
     }
 
-    private static @NotNull String resolveName(@NotNull UUID uuid) {
-        String name = Bukkit.getOfflinePlayer(uuid).getName();
-        return name != null ? name : uuid.toString();
+    private @NotNull String resolveName(@NotNull UUID uuid) {
+        return PartyNames.resolve(parties, uuid);
     }
 
 

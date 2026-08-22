@@ -18,6 +18,8 @@ import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.database.entity.InboundOfferView;
 import io.github.md5sha256.realty.database.entity.OutboundOfferView;
+import io.github.md5sha256.realty.api.ExecutorState;
+import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import net.kyori.adventure.text.Component;
@@ -54,7 +56,9 @@ import java.util.concurrent.CompletableFuture;
 public record OfferCommandGroup(
         @NotNull RealtyPaperApi api,
         @NotNull MessageContainer messages,
-        @NotNull RealtyEventDispatch events
+        @NotNull RealtyEventDispatch events,
+        @NotNull PartyService parties,
+        @NotNull ExecutorState executorState
 ) implements CustomCommandBean {
 
     @Override
@@ -190,6 +194,7 @@ public record OfferCommandGroup(
             ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
+        // Offers are always placed personally, so only the sender's own outbox applies here.
         api.listOutboundOffers(sender.getUniqueId()).thenAccept(offers -> {
             try {
                 if (offers.isEmpty()) {
@@ -232,7 +237,9 @@ public record OfferCommandGroup(
             ctx.sender().source().sendMessage(messages.messageFor(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
-        api.listInboundOffers(sender.getUniqueId()).thenAccept(offers -> {
+        // A government's inbox belongs to the people who run it: include every government the
+        // sender may act for, not just offers addressed to their own UUID.
+        inboundForAllParties(sender.getUniqueId()).thenAccept(offers -> {
             try {
                 if (offers.isEmpty()) {
                     sender.sendMessage(messages.messageFor(MessageKeys.OFFERS_INBOUND_NO_OFFERS));
@@ -269,6 +276,26 @@ public record OfferCommandGroup(
                         Placeholder.unparsed("error", ex.getMessage())));
             }
         });
+    }
+
+    /**
+     * Collects the inbound offers addressed to the sender and to every government they may act for.
+     *
+     * <p>The party lookup asks Treasury once per registered government, so it runs on the database
+     * executor rather than the calling thread.
+     */
+    private @NotNull CompletableFuture<List<InboundOfferView>> inboundForAllParties(@NotNull UUID actorId) {
+        return CompletableFuture
+                .supplyAsync(() -> parties.partiesFor(actorId), executorState.dbExec())
+                .thenCompose(partyIds -> {
+                    List<CompletableFuture<List<InboundOfferView>>> lookups = partyIds.stream()
+                            .map(api::listInboundOffers)
+                            .toList();
+                    return CompletableFuture.allOf(lookups.toArray(CompletableFuture[]::new))
+                            .thenApply(ignored -> lookups.stream()
+                                    .flatMap(lookup -> lookup.join().stream())
+                                    .toList());
+                });
     }
 
     // ── /realty offer accept <player> <region> ──

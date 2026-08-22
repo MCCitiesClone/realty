@@ -1,5 +1,8 @@
 # default-freehold-titleholder-uuid is optional, leave it blank to default to no-titleholder
 # default-freehold-titleholder-uuid: "00000000-0000-0000-0000-000000000000"
+# The party that oversees a freehold or leasehold by default. Normally a player UUID; to default
+# to a Treasury government instead, register it with `/realty government register <name>` and paste
+# the uuid that `/realty government list` prints for it.
 default-freehold-authority-uuid: "00000000-0000-0000-0000-000000000000"
 default-leasehold-authority-uuid: "00000000-0000-0000-0000-000000000000"
 date-format: "EEE, d MMMM yyyy (HH:mm)"

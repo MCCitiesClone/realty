@@ -5,6 +5,7 @@ import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.HistoryEventType;
 import io.github.md5sha256.realty.api.LeaseholdModificationStatus;
 import io.github.md5sha256.realty.api.LeaseholdRoles;
+import io.github.md5sha256.realty.api.PartyAuthorizer;
 import io.github.md5sha256.realty.api.RegionState;
 import io.github.md5sha256.realty.api.RealtyBackend;
 import io.github.md5sha256.realty.database.entity.ContractEntity;
@@ -24,6 +25,7 @@ import io.github.md5sha256.realty.database.entity.RealtyRegionEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractAuctionEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractBid;
 import io.github.md5sha256.realty.database.entity.FreeholdContractEntity;
+import io.github.md5sha256.realty.database.entity.GovernmentPartyEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractOfferEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractBidPaymentEntity;
 import io.github.md5sha256.realty.database.entity.FreeholdContractOfferPaymentEntity;
@@ -56,15 +58,31 @@ public class RealtyBackendImpl implements RealtyBackend {
     private final Function<UUID, CompletableFuture<String>> nameResolver;
     private final Function<LocalDateTime, String> dateFormatter;
     private final LongSupplier offerPaymentDurationSeconds;
+    private final PartyAuthorizer partyAuthorizer;
 
     public RealtyBackendImpl(@NotNull Database database,
                              @NotNull Function<UUID, CompletableFuture<String>> nameResolver,
                              @NotNull Function<LocalDateTime, String> dateFormatter,
                              @NotNull LongSupplier offerPaymentDurationSeconds) {
+        this(database, nameResolver, dateFormatter, offerPaymentDurationSeconds,
+                PartyAuthorizer.IDENTITY);
+    }
+
+    /**
+     * @param partyAuthorizer decides whether an actor may act as a party. Pass a Treasury-backed
+     *                        authorizer to let the members of a government account act for it;
+     *                        {@link PartyAuthorizer#IDENTITY} restricts every party to its own UUID.
+     */
+    public RealtyBackendImpl(@NotNull Database database,
+                             @NotNull Function<UUID, CompletableFuture<String>> nameResolver,
+                             @NotNull Function<LocalDateTime, String> dateFormatter,
+                             @NotNull LongSupplier offerPaymentDurationSeconds,
+                             @NotNull PartyAuthorizer partyAuthorizer) {
         this.database = database;
         this.nameResolver = nameResolver;
         this.dateFormatter = dateFormatter;
         this.offerPaymentDurationSeconds = offerPaymentDurationSeconds;
+        this.partyAuthorizer = partyAuthorizer;
     }
 
     // --- Sanctioned Auctioneers ---
@@ -102,7 +120,7 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (freehold == null) {
                 return new InviteAgentResult.NoFreeholdContract();
             }
-            if (!inviterId.equals(freehold.titleHolderId())) {
+            if (!partyAuthorizer.actsForNullable(inviterId, freehold.titleHolderId())) {
                 return new InviteAgentResult.NotTitleHolder();
             }
             if (inviteeId.equals(freehold.titleHolderId())) {
@@ -216,8 +234,8 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (wrapper.freeholdContractOfferMapper().existsByRegion(worldGuardRegionId, worldId)) {
                 return new CreateAuctionResult.OffersExist();
             }
-            if (!auctioneerId.equals(freehold.authorityId())
-                    && !auctioneerId.equals(freehold.titleHolderId())
+            if (!partyAuthorizer.actsFor(auctioneerId, freehold.authorityId())
+                    && !partyAuthorizer.actsForNullable(auctioneerId, freehold.titleHolderId())
                     && !wrapper.freeholdContractSanctionedAuctioneerMapper()
                             .existsByRegionAndAuctioneer(worldGuardRegionId, worldId, auctioneerId)) {
                 return new CreateAuctionResult.NotSanctioned();
@@ -770,7 +788,7 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (lease == null) {
                 return new SetRentableResult.NoLeaseholdContract();
             }
-            if (!bypassAuth && !actorId.equals(lease.landlordId())) {
+            if (!bypassAuth && !partyAuthorizer.actsFor(actorId, lease.landlordId())) {
                 return new SetRentableResult.NotAuthorized();
             }
             if (lease.acceptingTenants() == accepting) {
@@ -918,10 +936,10 @@ public class RealtyBackendImpl implements RealtyBackend {
             // Derive the proposer's role from the actor; an admin (bypass) acts as the landlord.
             String proposerRole;
             UUID proposerId;
-            if (actorId.equals(lease.tenantId())) {
+            if (partyAuthorizer.actsForNullable(actorId, lease.tenantId())) {
                 proposerRole = LeaseholdRoles.TENANT;
                 proposerId = lease.tenantId();
-            } else if (actorId.equals(lease.landlordId()) || bypassAuth) {
+            } else if (partyAuthorizer.actsFor(actorId, lease.landlordId()) || bypassAuth) {
                 proposerRole = LeaseholdRoles.LANDLORD;
                 proposerId = lease.landlordId();
             } else {
@@ -982,7 +1000,7 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (lease == null) {
                 return new ResolveModificationResult.NoLeaseholdContract();
             }
-            if (!bypassAuth && !actorId.equals(lease.landlordId())) {
+            if (!bypassAuth && !partyAuthorizer.actsFor(actorId, lease.landlordId())) {
                 return new ResolveModificationResult.NotAuthorized();
             }
             LeaseholdModificationEntity mod = wrapper.leaseholdModificationMapper()
@@ -1298,6 +1316,51 @@ public class RealtyBackendImpl implements RealtyBackend {
         }
     }
 
+    // --- Government Parties ---
+
+    @Override
+    public @NotNull GovernmentPartyEntity registerGovernmentParty(int accountId,
+                                                                   @NotNull String displayName) {
+        UUID partyUuid = GovernmentPartyEntity.partyIdFor(accountId);
+        try (SqlSessionWrapper wrapper = database.openSession();
+             SqlSession session = wrapper.session()) {
+            wrapper.governmentPartyMapper().upsert(partyUuid, accountId, displayName);
+            session.commit();
+        }
+        return new GovernmentPartyEntity(partyUuid, accountId, displayName);
+    }
+
+    @Override
+    public @Nullable GovernmentPartyEntity getGovernmentParty(@NotNull UUID partyUuid) {
+        try (SqlSessionWrapper wrapper = database.openSession()) {
+            return wrapper.governmentPartyMapper().selectByPartyUuid(partyUuid);
+        }
+    }
+
+    @Override
+    public @Nullable GovernmentPartyEntity getGovernmentPartyByAccountId(int accountId) {
+        try (SqlSessionWrapper wrapper = database.openSession()) {
+            return wrapper.governmentPartyMapper().selectByAccountId(accountId);
+        }
+    }
+
+    @Override
+    public @NotNull List<GovernmentPartyEntity> getGovernmentParties() {
+        try (SqlSessionWrapper wrapper = database.openSession()) {
+            return wrapper.governmentPartyMapper().selectAll();
+        }
+    }
+
+    @Override
+    public int deleteGovernmentParty(@NotNull UUID partyUuid) {
+        try (SqlSessionWrapper wrapper = database.openSession();
+             SqlSession session = wrapper.session()) {
+            int rows = wrapper.governmentPartyMapper().deleteByPartyUuid(partyUuid);
+            session.commit();
+            return rows;
+        }
+    }
+
     // --- Add/Remove permission check ---
 
     @Override
@@ -1305,16 +1368,20 @@ public class RealtyBackendImpl implements RealtyBackend {
                                         @NotNull UUID worldId,
                                         @NotNull UUID playerId) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
-            FreeholdContractMapper freeholdMapper = wrapper.freeholdContractMapper();
-            if (freeholdMapper.existsByRegionAndTitleHolder(worldGuardRegionId, worldId, playerId)) {
+            // Compared in Java rather than with the mapper's existsByRegionAndTitleHolder/
+            // existsByRegionAndTenant predicates: those match the stored UUID exactly, which a
+            // member acting for a government party never equals.
+            FreeholdContractEntity freehold = wrapper.freeholdContractMapper()
+                    .selectByRegion(worldGuardRegionId, worldId);
+            if (freehold != null
+                    && partyAuthorizer.actsForNullable(playerId, freehold.titleHolderId())) {
                 return true;
             }
-            LeaseholdContractMapper leaseholdMapper = wrapper.leaseholdContractMapper();
-            if (leaseholdMapper.existsByRegionAndTenant(worldGuardRegionId, worldId, playerId)) {
-                return true;
-            }
-            LeaseholdContractEntity lease = leaseholdMapper.selectByRegion(worldGuardRegionId, worldId);
-            return lease != null && lease.landlordId().equals(playerId);
+            LeaseholdContractEntity lease = wrapper.leaseholdContractMapper()
+                    .selectByRegion(worldGuardRegionId, worldId);
+            return lease != null
+                    && (partyAuthorizer.actsForNullable(playerId, lease.tenantId())
+                    || partyAuthorizer.actsFor(playerId, lease.landlordId()));
         }
     }
 
@@ -1428,8 +1495,8 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (freehold == null) {
                 return new RejectOfferResult.NoOffer();
             }
-            if (!callerId.equals(freehold.authorityId())
-                    && !callerId.equals(freehold.titleHolderId())
+            if (!partyAuthorizer.actsFor(callerId, freehold.authorityId())
+                    && !partyAuthorizer.actsForNullable(callerId, freehold.titleHolderId())
                     && !wrapper.freeholdContractSanctionedAuctioneerMapper()
                             .existsByRegionAndAuctioneer(worldGuardRegionId, worldId, callerId)) {
                 return new RejectOfferResult.NotSanctioned();
@@ -1462,8 +1529,8 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (freehold == null) {
                 return new RejectAllOffersResult.NoFreeholdContract();
             }
-            if (!callerId.equals(freehold.authorityId())
-                    && !callerId.equals(freehold.titleHolderId())
+            if (!partyAuthorizer.actsFor(callerId, freehold.authorityId())
+                    && !partyAuthorizer.actsForNullable(callerId, freehold.titleHolderId())
                     && !wrapper.freeholdContractSanctionedAuctioneerMapper()
                             .existsByRegionAndAuctioneer(worldGuardRegionId, worldId, callerId)) {
                 return new RejectAllOffersResult.NotSanctioned();
@@ -1538,8 +1605,8 @@ public class RealtyBackendImpl implements RealtyBackend {
                 return new ToggleOffersResult.NoFreeholdContract();
             }
             if (!bypassAuth
-                    && !callerId.equals(freehold.authorityId())
-                    && !callerId.equals(freehold.titleHolderId())
+                    && !partyAuthorizer.actsFor(callerId, freehold.authorityId())
+                    && !partyAuthorizer.actsForNullable(callerId, freehold.titleHolderId())
                     && !wrapper.freeholdContractSanctionedAuctioneerMapper()
                             .existsByRegionAndAuctioneer(worldGuardRegionId, worldId, callerId)) {
                 return new ToggleOffersResult.NotSanctioned();
@@ -1573,8 +1640,8 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (freehold == null) {
                 return new AcceptOfferResult.NoOffer();
             }
-            if (!callerId.equals(freehold.authorityId())
-                    && !callerId.equals(freehold.titleHolderId())
+            if (!partyAuthorizer.actsFor(callerId, freehold.authorityId())
+                    && !partyAuthorizer.actsForNullable(callerId, freehold.titleHolderId())
                     && !wrapper.freeholdContractSanctionedAuctioneerMapper()
                             .existsByRegionAndAuctioneer(worldGuardRegionId, worldId, callerId)) {
                 return new AcceptOfferResult.NotSanctioned();
