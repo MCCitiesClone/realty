@@ -1,5 +1,6 @@
 package io.github.md5sha256.realty.listener;
 
+import com.google.inject.Inject;
 import io.github.md5sha256.realty.api.CurrencyFormatter;
 import io.github.md5sha256.realty.api.DateTimeFormatters;
 import io.github.md5sha256.realty.api.LeaseholdRoles;
@@ -42,6 +43,7 @@ public final class RegionNotificationListener implements Listener {
     private final Message messages;
     private final PartyService parties;
 
+    @Inject
     public RegionNotificationListener(@NotNull RealtyEventDispatch events,
                                       @NotNull Message messages,
                                       @NotNull PartyService parties) {

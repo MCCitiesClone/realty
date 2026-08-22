@@ -1,5 +1,6 @@
 package io.github.md5sha256.realty.listener;
 
+import com.google.inject.Inject;
 import io.github.md5sha256.realty.api.RegionProfileService;
 import io.github.md5sha256.realty.api.SignCache;
 import io.github.md5sha256.realty.api.SignTextApplicator;
@@ -46,6 +47,7 @@ public class SignInteractionListener implements Listener {
     private final SignTextApplicator signTextApplicator;
     private final Message messages;
 
+    @Inject
     public SignInteractionListener(@NotNull Database database,
                                     @NotNull RealtyBackend logic,
                                     @NotNull RegionProfileService regionProfileService,

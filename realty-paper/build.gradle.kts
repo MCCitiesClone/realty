@@ -23,7 +23,6 @@ dependencies {
     }
     compileOnly("io.paradaux:treasury-api:2.2.1-SNAPSHOT")
     compileOnly("org.jetbrains:annotations:26.0.2-1")
-    implementation("org.incendo:cloud-paper:2.0.0-beta.10")
     implementation("com.github.MCCitiesClone:hibernia-framework:0e3d62e") {
         // Paper supplies slf4j at runtime. Bundling reflections' slf4j-api 1.7.32 would either
         // clash with Paper's 2.x or, if relocated, bind the framework's logging to a
@@ -71,9 +70,6 @@ tasks {
         relocate("org.jetbrains.annotations", "${base}.org.jetbrains.annotations")
         relocate("org.intellij.lang", "${base}.org.intellij.lang")
         relocate("net.kyori.option", "${base}.net.kyori.option")
-        // Still bundled by Cloud, not by Configurate; goes when Cloud does.
-        relocate("io.leangen.geantyref", "${base}.io.leangen.geantyref")
-        relocate("org.incendo.cloud", "${base}.org.incendo.cloud")
         relocate("org.enginehub.squirrelid", "${base}.org.enginehub.squirrelid")
         relocate("org.sqlite", "${base}.org.sqlite")
         // Hibernia and its DI stack. Relocated — unlike plugin-infrastructure above — because no

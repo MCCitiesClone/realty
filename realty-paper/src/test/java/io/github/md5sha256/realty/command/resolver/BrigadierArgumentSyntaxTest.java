@@ -1,5 +1,6 @@
-package io.github.md5sha256.realty.command.util;
+package io.github.md5sha256.realty.command.resolver;
 
+import io.github.md5sha256.realty.command.util.GroupPrefix;
 import io.github.md5sha256.realty.database.entity.GovernmentPartyEntity;
 import io.github.md5sha256.realty.party.PartyService;
 import org.junit.jupiter.api.Assertions;
@@ -11,7 +12,8 @@ import java.util.UUID;
 /**
  * Command arguments have to be typeable.
  *
- * <p>Cloud maps these parsers onto {@code StringArgumentType.word()}, whose reader accepts only
+ * <p>The commander maps these arguments onto {@code StringArgumentType.word()}, whose reader
+ * accepts only
  * {@code 0-9 A-Z a-z _ - . +} in an unquoted argument. Anything else ends the token early and the
  * <em>client</em> refuses the command — "Expected whitespace to end one argument, but found
  * trailing data" — before the server ever sees it. So a parser that answers to a syntax containing
@@ -32,8 +34,8 @@ class BrigadierArgumentSyntaxTest {
     @Test
     @DisplayName("the government prefix is typeable")
     void governmentPrefixIsTypeable() {
-        Assertions.assertTrue(typeableInACommand(AuthorityParser.GOVERNMENT_PREFIX),
-                "'" + AuthorityParser.GOVERNMENT_PREFIX + "' cannot be typed as a command argument;"
+        Assertions.assertTrue(typeableInACommand(AuthorityNames.GOVERNMENT_PREFIX),
+                "'" + AuthorityNames.GOVERNMENT_PREFIX + "' cannot be typed as a command argument;"
                         + " the client rejects the command before sending it");
     }
 
@@ -46,7 +48,7 @@ class BrigadierArgumentSyntaxTest {
 
         Assertions.assertEquals("GovDevelop", suggested);
         Assertions.assertTrue(typeableInACommand(suggested), suggested);
-        Assertions.assertTrue(typeableInACommand(AuthorityParser.GOVERNMENT_PREFIX + suggested));
+        Assertions.assertTrue(typeableInACommand(AuthorityNames.GOVERNMENT_PREFIX + suggested));
     }
 
     @Test
@@ -55,19 +57,19 @@ class BrigadierArgumentSyntaxTest {
         // Server-side parsing never saw the colon problem, so anything already written against the
         // old syntax keeps working even though it is no longer suggested.
         Assertions.assertEquals("GovDevelop",
-                AuthorityParser.governmentNameIfPrefixed("gov:GovDevelop"));
+                AuthorityNames.governmentNameIfPrefixed("gov:GovDevelop"));
         Assertions.assertEquals("GovDevelop",
-                AuthorityParser.governmentNameIfPrefixed("gov.GovDevelop"));
+                AuthorityNames.governmentNameIfPrefixed("gov.GovDevelop"));
         Assertions.assertEquals("GovDevelop",
-                AuthorityParser.governmentNameIfPrefixed("GOV.GovDevelop"));
+                AuthorityNames.governmentNameIfPrefixed("GOV.GovDevelop"));
     }
 
     @Test
     @DisplayName("a bare name is not treated as an explicit government reference")
     void bareNameIsNotForced() {
         // It still resolves to a government, but only after no such player is found.
-        Assertions.assertNull(AuthorityParser.governmentNameIfPrefixed("GovDevelop"));
-        Assertions.assertNull(AuthorityParser.governmentNameIfPrefixed("Notch"));
+        Assertions.assertNull(AuthorityNames.governmentNameIfPrefixed("GovDevelop"));
+        Assertions.assertNull(AuthorityNames.governmentNameIfPrefixed("Notch"));
     }
 
     @Test

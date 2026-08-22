@@ -1,5 +1,6 @@
 package io.github.md5sha256.realty.listener;
 
+import com.google.inject.Inject;
 import com.sk89q.worldedit.math.BlockVector3;
 import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
@@ -40,6 +41,7 @@ public final class SubregionWandListener implements Listener {
     private final SubregionWandManager wandManager;
     private final Message messages;
 
+    @Inject
     public SubregionWandListener(@NotNull Plugin plugin,
                                  @NotNull SubregionWand wand,
                                  @NotNull SubregionWandManager wandManager,

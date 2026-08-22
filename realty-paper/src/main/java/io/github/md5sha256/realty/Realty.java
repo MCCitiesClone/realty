@@ -25,44 +25,6 @@ import io.github.md5sha256.realty.api.event.AuctionEndedEvent;
 import io.github.md5sha256.realty.api.event.LeaseExpiredEvent;
 import io.github.md5sha256.realty.api.event.LeaseTerminatedEvent;
 import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
-import io.github.md5sha256.realty.command.AddCommand;
-import io.github.md5sha256.realty.command.AgentInviteAcceptCommand;
-import io.github.md5sha256.realty.command.AgentInviteCommand;
-import io.github.md5sha256.realty.command.AgentInviteRejectCommand;
-import io.github.md5sha256.realty.command.AgentInviteWithdrawCommand;
-import io.github.md5sha256.realty.command.AgentRemoveCommand;
-import io.github.md5sha256.realty.command.AuctionCommandGroup;
-import io.github.md5sha256.realty.command.BuyCommand;
-import io.github.md5sha256.realty.command.CleanupCommandGroup;
-import io.github.md5sha256.realty.command.CreateCommand;
-import io.github.md5sha256.realty.command.CustomCommandBean;
-import io.github.md5sha256.realty.command.DeleteCommand;
-import io.github.md5sha256.realty.command.ExtendCommand;
-import io.github.md5sha256.realty.command.GovernmentCommandGroup;
-import io.github.md5sha256.realty.command.HelpCommand;
-import io.github.md5sha256.realty.command.HistoryCommand;
-import io.github.md5sha256.realty.command.InfoCommand;
-import io.github.md5sha256.realty.command.ListCommand;
-import io.github.md5sha256.realty.command.OfferCommandGroup;
-import io.github.md5sha256.realty.command.RegisterCommand;
-import io.github.md5sha256.realty.command.ModuleCommandGroup;
-import io.github.md5sha256.realty.command.ReloadCommand;
-import io.github.md5sha256.realty.command.RemoveCommand;
-import io.github.md5sha256.realty.command.RentCommand;
-import io.github.md5sha256.realty.command.RentableCommand;
-import io.github.md5sha256.realty.command.SearchCommand;
-import io.github.md5sha256.realty.command.SearchDialog;
-import io.github.md5sha256.realty.command.ModifyCommandGroup;
-import io.github.md5sha256.realty.command.SetCommandGroup;
-import io.github.md5sha256.realty.command.TerminateCommand;
-import io.github.md5sha256.realty.command.SignCommand;
-import io.github.md5sha256.realty.command.SubregionCommandGroup;
-import io.github.md5sha256.realty.command.TagCommandGroup;
-import io.github.md5sha256.realty.command.TeleportCommand;
-import io.github.md5sha256.realty.command.TransferCommand;
-import io.github.md5sha256.realty.command.UnrentCommand;
-import io.github.md5sha256.realty.command.UnsetCommandGroup;
-import io.github.md5sha256.realty.command.VersionCommand;
 import io.github.md5sha256.realty.command.util.SafeLocationFinder;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.RealtyBackendImpl;
@@ -73,7 +35,6 @@ import io.github.md5sha256.realty.listener.PropertyTaxListener;
 import io.github.md5sha256.realty.listener.RegionNotificationListener;
 import io.github.md5sha256.realty.listener.SignInteractionListener;
 import io.github.md5sha256.realty.listener.SubregionWandListener;
-import io.github.md5sha256.realty.command.SubregionDialog;
 import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
 import io.paradaux.hibernia.framework.i18n.Message;
@@ -88,7 +49,11 @@ import io.github.md5sha256.realty.settings.RegionTagSettings;
 import io.github.md5sha256.realty.settings.Settings;
 import io.github.md5sha256.realty.settings.TaxSettings;
 import io.github.md5sha256.realty.util.SquirrelIdUsernameResolver;
+import io.github.md5sha256.realty.command.RealtyCommands;
+import io.github.md5sha256.realty.listener.RealtyListeners;
+import io.paradaux.hibernia.framework.commander.CommandManager;
 import io.paradaux.hibernia.framework.configurator.ConfigurationLoader;
+import io.paradaux.hibernia.framework.events.ListenerManager;
 import io.paradaux.hibernia.framework.guice.HiberniaModule;
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
@@ -106,11 +71,6 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.incendo.cloud.Command;
-import org.incendo.cloud.execution.ExecutionCoordinator;
-import org.incendo.cloud.paper.PaperCommandManager;
-import org.incendo.cloud.paper.util.sender.PaperSimpleSenderMapper;
-import org.incendo.cloud.paper.util.sender.Source;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -250,6 +210,9 @@ public final class Realty extends JavaPlugin {
                     .scanConfiguration("io.github.md5sha256.realty.settings")
                     .scanConfiguration("io.github.md5sha256.realty")
                     .reconcileFiles(CONFIG_FILES)
+                    .handlers(RealtyCommands.handlers())
+                    .resolvers(RealtyCommands.resolvers())
+                    .listeners(RealtyListeners.listeners())
                     .build();
             this.databaseSettings = this.hibernia.configuration(DatabaseSettings.class);
             this.settings.set(this.hibernia.configuration(Settings.class));
@@ -334,13 +297,6 @@ public final class Realty extends JavaPlugin {
                 this, this.regionProfileService, this.executorState, this.logic,
                 this.signTextApplicator, this.signCache);
         this.profileApplicator.applyAll(this.settings.get().profileReapplyPerTick());
-        getServer().getPluginManager().registerEvents(
-                new SignInteractionListener(this.database, this.logic,
-                        this.regionProfileService, this.executorState, this.signCache,
-                        this.signTextApplicator, this.messageContainer), this);
-        if (getServer().getPluginManager().isPluginEnabled("Treasury")) {
-            registerTreasuryTaxProvider();
-        }
         this.paperApi = new RealtyPaperApiImpl(
                 this.logic, economyProvider, this.executorState, this.database,
                 this.regionProfileService, this.signTextApplicator, this.signCache,
@@ -360,10 +316,9 @@ public final class Realty extends JavaPlugin {
         this.subregionWandManager = new SubregionWandManager();
         this.injector = createInjector(economyProvider, safeLocationFinder);
         scheduleTasks();
-        registerCommands(this.paperApi,
-                this.executorState,
-                this.messageContainer,
-                safeLocationFinder);
+        this.injector.getInstance(CommandManager.class).registerAll();
+        this.injector.getInstance(ListenerManager.class).registerAll();
+        registerConditionalListeners();
         getServer().getServicesManager()
                 .register(RealtyBackend.class, this.logic, this, ServicePriority.Normal);
         getServer().getServicesManager()
@@ -446,6 +401,18 @@ public final class Realty extends JavaPlugin {
         this.configuration = created.getInstance(ConfigurationLoader.class);
         this.messageContainer = created.getInstance(Message.class);
         return created;
+    }
+
+    /**
+     * Listeners the framework cannot register for us.
+     *
+     * <p>{@code ListenerManager} registers its set unconditionally; the property-tax listener only
+     * makes sense when Treasury is present, so it stays behind the same check it always had.</p>
+     */
+    private void registerConditionalListeners() {
+        if (getServer().getPluginManager().isPluginEnabled("Treasury")) {
+            registerTreasuryTaxProvider();
+        }
     }
 
     private void registerTreasuryTaxProvider() {
@@ -832,109 +799,6 @@ public final class Realty extends JavaPlugin {
         });
     }
 
-    private void registerCommands(
-            @NotNull RealtyPaperApi paperApi,
-            @NotNull ExecutorState executorState,
-            @NotNull Message messageContainer,
-            @NotNull SafeLocationFinder safeLocationFinder
-    ) {
-        String version = getPluginMeta().getVersion();
-        var helpCommand = new HelpCommand(messageContainer);
-
-        SubregionDialog subregionDialog = new SubregionDialog(paperApi, executorState,
-                this.database, this.subregionWandManager, this.settings, this.realtyTags,
-                messageContainer);
-        PluginManager pluginManager = getServer().getPluginManager();
-        pluginManager.registerEvents(
-                new SubregionWandListener(this, this.subregionWand, this.subregionWandManager,
-                        messageContainer), this);
-        pluginManager.registerEvents(
-                new RegionNotificationListener(this.eventDispatch, messageContainer,
-                        this.partyService), this);
-
-        List<CustomCommandBean> commands = List.of(
-                new VersionCommand(version),
-                new AddCommand(messageContainer),
-                new AgentInviteCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentInviteAcceptCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentInviteRejectCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentInviteWithdrawCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentRemoveCommand(paperApi, messageContainer, this.eventDispatch),
-                new AuctionCommandGroup(paperApi,
-                        this.settings,
-                        messageContainer,
-                        this.eventDispatch,
-                        this.partyService),
-                new BuyCommand(paperApi, messageContainer, this.eventDispatch),
-                new CreateCommand(paperApi, this.settings, messageContainer, this.eventDispatch,
-                        this.partyService),
-                new RegisterCommand(paperApi, this.settings, messageContainer, this.eventDispatch,
-                        this.partyService),
-                new DeleteCommand(paperApi, messageContainer, this.eventDispatch),
-                new HistoryCommand(paperApi, this.settings, messageContainer, this.partyService),
-                new InfoCommand(paperApi,
-                        this.settings,
-                        this.database,
-                        this.realtyTags,
-                        messageContainer,
-                        this.partyService),
-                new ListCommand(paperApi, messageContainer, this.partyService),
-                new OfferCommandGroup(paperApi,
-                        messageContainer,
-                        this.eventDispatch,
-                        this.partyService,
-                        executorState),
-                new ExtendCommand(paperApi, messageContainer, this.eventDispatch),
-                new RentCommand(paperApi, messageContainer, this.eventDispatch),
-                new RentableCommand(paperApi, messageContainer),
-                new UnrentCommand(paperApi, messageContainer, this.eventDispatch),
-                new SetCommandGroup(paperApi, messageContainer, this.eventDispatch, this.partyService),
-                new ModifyCommandGroup(paperApi, messageContainer, this.eventDispatch, this.partyService),
-                new TerminateCommand(paperApi, messageContainer, this.eventDispatch),
-                new TransferCommand(paperApi, messageContainer, this.eventDispatch, this.partyService),
-                new UnsetCommandGroup(paperApi, messageContainer),
-                new GovernmentCommandGroup(this.partyService, executorState, messageContainer),
-                new ModuleCommandGroup(this.moduleManager, executorState, messageContainer),
-                new ReloadCommand(executorState, () -> {
-                    performReload();
-                    return null;
-                }, messageContainer),
-                new RemoveCommand(messageContainer),
-                new SignCommand(paperApi, executorState, messageContainer, this.partyService),
-                new TeleportCommand(getLogger(), paperApi, this.settings, messageContainer, safeLocationFinder),
-                new SubregionCommandGroup(this.subregionWand, this.subregionWandManager,
-                        subregionDialog, messageContainer),
-                new CleanupCommandGroup(this.database,
-                        executorState,
-                        this.realtyTags,
-                        messageContainer),
-                new TagCommandGroup(this.database,
-                        executorState,
-                        this.realtyTags,
-                        messageContainer),
-                new SearchCommand(
-                        new SearchDialog(this.database, executorState,
-                                this.realtyTags, messageContainer),
-                        messageContainer)
-        );
-
-        var manager = PaperCommandManager.builder(PaperSimpleSenderMapper.simpleSenderMapper())
-                .executionCoordinator(ExecutionCoordinator.simpleCoordinator())
-                .buildOnEnable(this);
-        manager.brigadierManager().setNativeNumberSuggestions(true);
-        Command.Builder<Source> rootBuilder = manager.commandBuilder("realty", "rl");
-        // Register help commands and proxy the root literal to the base help command
-        List<Command<? extends Source>> helpCommands = helpCommand.commands(rootBuilder);
-        for (Command<? extends Source> cmd : helpCommands) {
-            manager.command(cmd);
-        }
-        manager.command(rootBuilder.proxies(helpCommands.getFirst()));
-        for (CustomCommandBean bean : commands) {
-            for (Command<? extends Source> cmd : bean.commands(rootBuilder)) {
-                manager.command(cmd);
-            }
-        }
-    }
 
     private void copyResourceTemplate(@NotNull String resourceName,
                                       @NotNull String targetName) throws IOException {

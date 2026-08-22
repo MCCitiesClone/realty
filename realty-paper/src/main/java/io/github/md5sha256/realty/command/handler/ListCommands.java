@@ -1,107 +1,109 @@
-package io.github.md5sha256.realty.command;
+package io.github.md5sha256.realty.command.handler;
 
+import com.google.inject.Inject;
 import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.command.util.NamedAuthority;
-import io.github.md5sha256.realty.command.util.NamedAuthorityParser;
-import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
 import io.github.md5sha256.realty.database.entity.RealtyRegionEntity;
-import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
+import io.github.md5sha256.realty.party.PartyService;
+import io.paradaux.hibernia.framework.commander.annotations.Command;
+import io.paradaux.hibernia.framework.commander.annotations.Description;
+import io.paradaux.hibernia.framework.commander.annotations.Flag;
+import io.paradaux.hibernia.framework.commander.annotations.Permission;
+import io.paradaux.hibernia.framework.commander.annotations.Route;
+import io.paradaux.hibernia.framework.commander.annotations.Sender;
+import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
+import io.paradaux.hibernia.framework.i18n.Message;
+import java.util.List;
+import java.util.UUID;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.incendo.cloud.Command;
-import org.incendo.cloud.context.CommandContext;
-import org.incendo.cloud.paper.util.sender.PlayerSource;
-import org.incendo.cloud.paper.util.sender.Source;
-import org.incendo.cloud.parser.flag.CommandFlag;
-import org.incendo.cloud.parser.standard.IntegerParser;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-import java.util.UUID;
-
 /**
- * Handles {@code /realty list [owned|rented] [--page <n>] [--player <name>]}.
- *
- * <p>Permission: {@code realty.command.list}.</p>
+ * The {@code /realty list …} family: the regions a party holds, rents or owns outright.
  */
-public record ListCommand(
-        @NotNull RealtyPaperApi api,
-        @NotNull Message messages,
-        @NotNull PartyService parties
-) implements CustomCommandBean {
+@Command({"realty", "rl"})
+public final class ListCommands implements CommandHandler {
+
+    private final RealtyPaperApi api;
+    private final Message messages;
+    private final PartyService parties;
+
+    @Inject
+    public ListCommands(@NotNull RealtyPaperApi api,
+                        @NotNull Message messages,
+                        @NotNull PartyService parties) {
+        this.api = api;
+        this.messages = messages;
+        this.parties = parties;
+    }
+
+    @Route("list")
+    @Permission("realty.command.list")
+    @Description("List the regions you hold")
+    public void list(@Sender CommandSender sender,
+                     @Flag("player") @Nullable NamedAuthority player,
+                     @Flag(value = "page", defaultValue = "1") int page) {
+        show(sender, player, null, page);
+    }
+
+    @Route("list owned")
+    @Permission("realty.command.list")
+    @Description("List the freeholds you hold")
+    public void listOwned(@Sender CommandSender sender,
+                          @Flag("player") @Nullable NamedAuthority player,
+                          @Flag(value = "page", defaultValue = "1") int page) {
+        show(sender, player, "owned", page);
+    }
+
+    @Route("list rented")
+    @Permission("realty.command.list")
+    @Description("List the regions you rent")
+    public void listRented(@Sender CommandSender sender,
+                           @Flag("player") @Nullable NamedAuthority player,
+                           @Flag(value = "page", defaultValue = "1") int page) {
+        show(sender, player, "rented", page);
+    }
+
+    @Route("list me")
+    @Permission("realty.command.list")
+    @Description("List the regions you hold")
+    public void listMe(@Sender CommandSender rawSender,
+                       @Flag(value = "page", defaultValue = "1") int page) {
+        // The proxy the Cloud tree spelled by injecting a --player flag pointing at the sender.
+        // Stated directly here instead: /realty list me is /realty list --player <you>.
+        if (!(rawSender instanceof Player player)) {
+            rawSender.sendMessage(this.messages.component(MessageKeys.LIST_PLAYERS_ONLY));
+            return;
+        }
+        show(player, new NamedAuthority(player.getUniqueId(), player.getName()), null, page);
+    }
+
+    /**
+     * Resolves whose regions to list -- the named party, or the sender when none was given -- and
+     * renders the page.
+     */
+    private void show(@NotNull CommandSender sender, @Nullable NamedAuthority authority,
+                      @Nullable String category, int page) {
+        if (authority != null) {
+            listRegions(sender, authority.uuid(), authority.name(), category, page);
+            return;
+        }
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(this.messages.component(MessageKeys.LIST_PLAYERS_ONLY));
+            return;
+        }
+        listRegions(sender, player.getUniqueId(), player.getName(), category, page);
+    }
 
     private static final int PAGE_SIZE = 10;
-
-    // Built per registration rather than held as a constant: the parser resolves gov:<Name>
-    // through the party service, which a static initialiser cannot reach. Flag values are read
-    // back by name, so the declaring instance need not be the same object.
-    private static final String PLAYER_FLAG = "player";
-
-    private @NotNull CommandFlag<NamedAuthority> playerFlag() {
-        return CommandFlag.<Source>builder(PLAYER_FLAG)
-                .withComponent(NamedAuthorityParser.party(parties))
-                .build();
-    }
-
-    private static final CommandFlag<Integer> PAGE_FLAG =
-            CommandFlag.<Source>builder("page")
-                    .withComponent(IntegerParser.integerParser(1))
-                    .build();
-
-    @Override
-    public @NotNull List<Command<? extends Source>> commands(@NotNull Command.Builder<Source> builder) {
-        var base = builder
-                .literal("list")
-                .permission("realty.command.list")
-                .flag(playerFlag())
-                .flag(PAGE_FLAG);
-        var meProxy = builder.literal("me")
-                .senderType(PlayerSource.class)
-                .permission("realty.command.list")
-                .flag(PAGE_FLAG)
-                .handler(ctx -> {
-                    var player = ctx.sender().source();
-                    ctx.flags()
-                            .addValueFlag(playerFlag(),
-                                    new NamedAuthority(player.getUniqueId(), player.getName()));
-                    execute(ctx, null);
-                })
-                .build();
-        return List.of(
-                meProxy,
-                base.handler(ctx -> execute(ctx, null))
-                        .build(),
-                base.literal("owned")
-                        .handler(ctx -> execute(ctx, "owned"))
-                        .build(),
-                base.literal("rented")
-                        .handler(ctx -> execute(ctx, "rented"))
-                        .build()
-        );
-    }
-
-    private void execute(@NotNull CommandContext<? extends Source> ctx,
-                         @Nullable String category) {
-        CommandSender sender = ctx.sender().source();
-        int page = ctx.flags().getValue(PAGE_FLAG, 1);
-        NamedAuthority authority = ctx.flags().getValue(PLAYER_FLAG, null);
-        if (authority != null) {
-            resolvePlayer(sender, authority, category, page);
-        } else {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage(messages.component(MessageKeys.LIST_PLAYERS_ONLY));
-                return;
-            }
-            listRegions(sender, player.getUniqueId(), player.getName(), category, page);
-        }
-    }
 
     private void resolvePlayer(@NotNull CommandSender sender, @NotNull NamedAuthority authority,
                                @Nullable String category, int page) {
@@ -120,17 +122,17 @@ public record ListCommand(
     private void listAll(@NotNull CommandSender sender, @NotNull UUID targetId,
                          @NotNull String targetName, int page) {
         int globalOffset = (page - 1) * PAGE_SIZE;
-        api.listRegions(targetId, PAGE_SIZE, globalOffset).thenAccept(result -> {
+        this.api.listRegions(targetId, PAGE_SIZE, globalOffset).thenAccept(result -> {
             int totalCount = result.totalCount();
             if (totalCount == 0) {
-                sender.sendMessage(messages.component(MessageKeys.LIST_NO_REGIONS,
+                sender.sendMessage(this.messages.component(MessageKeys.LIST_NO_REGIONS,
                         "player", targetName));
                 return;
             }
 
             int totalPages = (totalCount + PAGE_SIZE - 1) / PAGE_SIZE;
             if (page > totalPages) {
-                sender.sendMessage(messages.component(MessageKeys.LIST_INVALID_PAGE,
+                sender.sendMessage(this.messages.component(MessageKeys.LIST_INVALID_PAGE,
                         "page", String.valueOf(page),
                         "total", String.valueOf(totalPages)));
                 return;
@@ -144,7 +146,7 @@ public record ListCommand(
             appendFooter(builder, targetName, null, page, totalPages);
             sender.sendMessage(builder.build());
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.component(MessageKeys.LIST_ERROR,
+            sender.sendMessage(this.messages.component(MessageKeys.LIST_ERROR,
                     "error", ex.getMessage()));
             return null;
         });
@@ -153,19 +155,19 @@ public record ListCommand(
     private void listCategory(@NotNull CommandSender sender, @NotNull UUID targetId,
                               @NotNull String targetName, @NotNull String category, int page) {
         var future = "owned".equals(category)
-                ? api.listOwnedRegions(targetId, PAGE_SIZE, (page - 1) * PAGE_SIZE)
-                : api.listRentedRegions(targetId, PAGE_SIZE, (page - 1) * PAGE_SIZE);
+                ? this.api.listOwnedRegions(targetId, PAGE_SIZE, (page - 1) * PAGE_SIZE)
+                : this.api.listRentedRegions(targetId, PAGE_SIZE, (page - 1) * PAGE_SIZE);
 
         future.thenAccept(result -> {
             if (result.totalCount() == 0) {
-                sender.sendMessage(messages.component(MessageKeys.LIST_NO_REGIONS,
+                sender.sendMessage(this.messages.component(MessageKeys.LIST_NO_REGIONS,
                         "player", targetName));
                 return;
             }
 
             int totalPages = (result.totalCount() + PAGE_SIZE - 1) / PAGE_SIZE;
             if (page > totalPages) {
-                sender.sendMessage(messages.component(MessageKeys.LIST_INVALID_PAGE,
+                sender.sendMessage(this.messages.component(MessageKeys.LIST_INVALID_PAGE,
                         "page", String.valueOf(page),
                         "total", String.valueOf(totalPages)));
                 return;
@@ -182,7 +184,7 @@ public record ListCommand(
             appendFooter(builder, targetName, category, page, totalPages);
             sender.sendMessage(builder.build());
         }).exceptionally(ex -> {
-            sender.sendMessage(messages.component(MessageKeys.LIST_ERROR,
+            sender.sendMessage(this.messages.component(MessageKeys.LIST_ERROR,
                     "error", ex.getMessage()));
             return null;
         });
@@ -216,7 +218,7 @@ public record ListCommand(
         builder.appendNewline()
                 .append(parseMiniMessage(MessageKeys.LIST_CATEGORY, "label", label));
         for (RealtyRegionEntity region : regions) {
-            LeaseholdContractEntity leasehold = api.getLeaseholdContract(
+            LeaseholdContractEntity leasehold = this.api.getLeaseholdContract(
                     region.worldGuardRegionId(), region.worldId()).join();
             String timeLeft = DurationFormatter.formatTimeLeft(leasehold != null ? leasehold.endDate() : null);
             builder.appendNewline()
@@ -237,7 +239,7 @@ public record ListCommand(
                 ? buildNavComponent(MessageKeys.LIST_NEXT, targetName, category, page + 1)
                 : Component.empty();
         builder.appendNewline()
-                .append(messages.component(MessageKeys.LIST_FOOTER,
+                .append(this.messages.component(MessageKeys.LIST_FOOTER,
                         "page", String.valueOf(page),
                         "total", String.valueOf(totalPages),
                         "previous", previousComponent,
@@ -271,7 +273,6 @@ public record ListCommand(
      */
     private @NotNull Component parseMiniMessage(@NotNull String key,
                                                 @NotNull Object... replacements) {
-        return MiniMessage.miniMessage().deserialize(messages.format(key, replacements));
+        return MiniMessage.miniMessage().deserialize(this.messages.format(key, replacements));
     }
-
 }

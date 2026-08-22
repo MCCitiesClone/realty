@@ -318,7 +318,7 @@ public final class SearchDialog {
     /**
      * Executes the search query and sends paginated results to the audience.
      */
-    void performSearch(@NotNull Audience sender,
+    public void performSearch(@NotNull Audience sender,
                        boolean includeFreehold, boolean includeLeasehold,
                        @Nullable Collection<String> tagIds,
                        @Nullable Collection<String> excludedTagIds,
