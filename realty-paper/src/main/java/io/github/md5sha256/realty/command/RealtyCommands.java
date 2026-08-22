@@ -33,6 +33,7 @@ import io.github.md5sha256.realty.command.handler.UnrentCommand;
 import io.github.md5sha256.realty.command.handler.UnsetCommands;
 import io.github.md5sha256.realty.command.handler.VersionCommand;
 import io.github.md5sha256.realty.command.resolver.DurationResolver;
+import io.github.md5sha256.realty.command.resolver.HelpCategoryResolver;
 import io.github.md5sha256.realty.command.resolver.MemberNameResolver;
 import io.github.md5sha256.realty.command.resolver.ModuleNameResolver;
 import io.github.md5sha256.realty.command.resolver.NamedAuthorityResolver;
@@ -96,7 +97,8 @@ public final class RealtyCommands {
             MemberNameResolver.class,
             DurationResolver.class,
             ModuleNameResolver.class,
-            TagIdResolver.class);
+            TagIdResolver.class,
+            HelpCategoryResolver.class);
 
     /** {@link #HANDLERS} as the array the framework's builder takes. */
     @SuppressWarnings("unchecked")

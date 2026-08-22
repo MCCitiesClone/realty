@@ -16,7 +16,6 @@ import io.paradaux.hibernia.framework.usher.DialogFlow;
 import io.paradaux.hibernia.framework.usher.DialogView;
 import io.paradaux.hibernia.framework.usher.Text;
 import io.paradaux.hibernia.framework.usher.annotations.Action;
-import io.paradaux.hibernia.framework.usher.annotations.ActionArg;
 import io.paradaux.hibernia.framework.usher.annotations.Dialog;
 import io.paradaux.hibernia.framework.usher.annotations.Input;
 import io.paradaux.hibernia.framework.usher.annotations.Model;

@@ -12,7 +12,7 @@ dependencies {
     compileOnlyApi("org.jetbrains:annotations:26.0.2-1")
     // Only for the annotations on SignProfile; compileOnly because the shaded plugin
     // supplies (and relocates) the framework at runtime.
-    compileOnly("com.github.MCCitiesClone:hibernia-framework:0e3d62e")
+    compileOnly("com.github.MCCitiesClone:hibernia-framework:93e31cf")
     testImplementation("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
 }
 

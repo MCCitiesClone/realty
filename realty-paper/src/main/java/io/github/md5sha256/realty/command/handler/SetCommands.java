@@ -28,7 +28,6 @@ import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
 import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -64,7 +63,7 @@ public final class SetCommands implements CommandHandler {
     @Permission("realty.command.set.price")
     @Description("Set a region's price")
     public void setPrice(@Sender CommandSender sender,
-                         @Arg("price") double price,
+                         @Arg(value = "price", min = 0.01) double price,
                          @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
         WorldGuardRegion region = namedRegion != null ? namedRegion
                 : (sender instanceof Player player
@@ -107,7 +106,6 @@ public final class SetCommands implements CommandHandler {
                                 "region", regionId));
             }
         }));
-    
     }
 
     @Route("set duration <duration> [region]")
@@ -141,7 +139,6 @@ public final class SetCommands implements CommandHandler {
                                 "region", regionId));
             }
         }));
-    
     }
 
     @Route("set landlord <landlord> [region]")
@@ -179,7 +176,6 @@ public final class SetCommands implements CommandHandler {
                                 "error", error.message()));
             }
         }));
-    
     }
 
     @Route("set titleholder <titleholder> [region]")
@@ -227,7 +223,6 @@ public final class SetCommands implements CommandHandler {
                                 "error", error.message()));
             }
         });
-    
     }
 
     @Route("set tenant <tenant> [region]")
@@ -266,14 +261,13 @@ public final class SetCommands implements CommandHandler {
                                 "error", error.message()));
             }
         }));
-    
     }
 
     @Route("set maxextensions <maxextensions> [region]")
     @Permission("realty.command.set.maxextensions")
     @Description("Set how many times a lease may be extended")
     public void setMaxExtensions(@Sender CommandSender sender,
-                                 @Arg("maxextensions") int maxextensions,
+                                 @Arg(value = "maxextensions", min = -1) int maxextensions,
                                  @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
 
                 int maxExtensions = maxextensions;
@@ -306,7 +300,6 @@ public final class SetCommands implements CommandHandler {
                                 "region", regionId));
             }
         }));
-    
     }
 
     @Route("set authority <authority> [region]")
@@ -346,11 +339,10 @@ public final class SetCommands implements CommandHandler {
                                 "region", regionId));
             }
         });
-    
     }
 
     private @NotNull String resolveName(@NotNull UUID uuid) {
-        return PartyNames.resolve(parties, uuid);
+        return PartyNames.resolve(this.parties, uuid);
     }
 
     /**

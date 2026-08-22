@@ -63,7 +63,7 @@ public final class ModifyCommands implements CommandHandler {
     @Permission("realty.command.modify.price")
     @Description("Propose a new price to the other party")
     public void proposePrice(@Sender CommandSender rawSender,
-                              @Arg("price") double price,
+                              @Arg(value = "price", min = 0.01) double price,
                               @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
         Player sender = playerOrReject(rawSender);
         if (sender == null) {
@@ -97,7 +97,7 @@ public final class ModifyCommands implements CommandHandler {
     @Permission("realty.command.modify.maxextensions")
     @Description("Propose a new extension limit to the other party")
     public void proposeMaxExtensions(@Sender CommandSender rawSender,
-                                      @Arg("maxextensions") int maxextensions,
+                                      @Arg(value = "maxextensions", min = 0) int maxextensions,
                                       @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
         Player sender = playerOrReject(rawSender);
         if (sender == null) {
@@ -181,7 +181,6 @@ public final class ModifyCommands implements CommandHandler {
             }
             sender.sendMessage(output);
         });
-    
     }
 
     @Route("modify outbox")
@@ -209,7 +208,6 @@ public final class ModifyCommands implements CommandHandler {
             }
             sender.sendMessage(output);
         });
-    
     }
 
     /**
@@ -325,14 +323,14 @@ public final class ModifyCommands implements CommandHandler {
 
     
 
-    /** Renders the non-null proposed terms as a localized summary (formatting lives in this.messages.yml). */
+    /** Renders the non-null proposed terms as a localized summary (formatting lives in this.messages.properties). */
     private @NotNull Component describeChanges(@NotNull LeaseholdModificationView view) {
         return LeaseholdChangeSummary.render(messages,
                 view.newPrice(), view.newDurationSeconds(), view.newMaxExtensions());
     }
 
     private @NotNull String resolveName(@NotNull UUID uuid) {
-        return PartyNames.resolve(parties, uuid);
+        return PartyNames.resolve(this.parties, uuid);
     }
 
     /** The three ways to resolve a pending proposal, each carrying its success message and resolution name. */

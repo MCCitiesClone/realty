@@ -2,6 +2,7 @@ package io.github.md5sha256.realty.command.handler;
 
 import com.google.inject.Inject;
 import io.github.md5sha256.realty.localisation.MessageKeys;
+import io.github.md5sha256.realty.command.resolver.HelpCategory;
 import io.paradaux.hibernia.framework.commander.annotations.Arg;
 import io.paradaux.hibernia.framework.commander.annotations.Command;
 import io.paradaux.hibernia.framework.commander.annotations.Description;
@@ -10,12 +11,10 @@ import io.paradaux.hibernia.framework.commander.annotations.Route;
 import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
-import java.util.List;
+import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /** The {@code /realty help …} family. */
 @Command({"realty", "rl"})
@@ -34,16 +33,15 @@ public final class HelpCommands implements CommandHandler {
     public void help(@Sender CommandSender sender) {
 
                 sender.sendMessage(this.messages.component(MessageKeys.HELP_MAIN));
-    
     }
 
     @Route("help <category>")
     @Permission("realty.command.help")
     @Description("Show help for one category")
     public void helpCategory(@Sender CommandSender sender,
-                             @Arg("category") String category) {
+                             @Arg("category") HelpCategory category) {
 
-                String requested = category.toLowerCase(java.util.Locale.ROOT);
+                String requested = category.value().toLowerCase(Locale.ROOT);
         if (!ALL_CATEGORIES.contains(requested)) {
             sender.sendMessage(this.messages.component(MessageKeys.HELP_UNKNOWN_CATEGORY));
             return;
@@ -57,9 +55,6 @@ public final class HelpCommands implements CommandHandler {
             default -> MessageKeys.HELP_UNKNOWN_CATEGORY;
         };
         sender.sendMessage(this.messages.component(key));
-    
     }
-
-    private static final Set<String> VISIBLE_CATEGORIES = Set.of("basics", "management", "offers", "auctions");
     private static final Set<String> ALL_CATEGORIES = Set.of("basics", "management", "offers", "auctions", "admin");
 }

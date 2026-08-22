@@ -2,13 +2,11 @@ package io.github.md5sha256.realty.settings;
 
 import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
 import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationComponent;
-import io.github.md5sha256.realty.api.RegionState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @ConfigurationComponent(file = "settings.yml")

@@ -116,7 +116,6 @@ public final class AuctionCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         });
-    
     }
 
     @Route("auction <bidDuration> <paymentDuration> <minBid> <minBidStep> [region]")
@@ -125,8 +124,8 @@ public final class AuctionCommands implements CommandHandler {
     public void create(@Sender CommandSender sender,
                        @Arg("bidDuration") Duration bidDuration,
                        @Arg("paymentDuration") Duration paymentDuration,
-                       @Arg("minBid") double minBid,
-                       @Arg("minBidStep") double minBidStep,
+                       @Arg(value = "minBid", min = 0.01) double minBid,
+                       @Arg(value = "minBidStep", min = 0.01) double minBidStep,
                        @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
 
                 if (!(sender instanceof Player player)) {
@@ -175,7 +174,6 @@ public final class AuctionCommands implements CommandHandler {
                     "error", ex.getMessage()));
             return null;
         });
-    
     }
 
     @Route("auction cancel [region]")
@@ -212,14 +210,13 @@ public final class AuctionCommands implements CommandHandler {
                     "error", ex.getMessage()));
             return null;
         });
-    
     }
 
     @Route("auction bid <bid> [region]")
     @Permission("realty.command.auction.bid")
     @Description("Place a bid on an auction")
     public void bid(@Sender CommandSender rawSender,
-                    @Arg("bid") double bid,
+                    @Arg(value = "bid", min = 0.01) double bid,
                     @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
 
         if (!(rawSender instanceof Player sender)) {
@@ -270,14 +267,13 @@ public final class AuctionCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("auction paybid <amount> [region]")
     @Permission("realty.command.auction.paybid")
     @Description("Pay for an auction you won")
     public void payBid(@Sender CommandSender rawSender,
-                       @Arg("amount") double amount,
+                       @Arg(value = "amount", min = 0) double amount,
                        @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
 
         if (!(rawSender instanceof Player sender)) {
@@ -334,22 +330,12 @@ public final class AuctionCommands implements CommandHandler {
                                 "error", error.message()));
             }
         });
-    
     }
 
     
-
-    // ── /realty auction info [region] ──
 
     private @NotNull String resolveName(@NotNull UUID uuid) {
-        return PartyNames.resolve(parties, uuid);
+        return PartyNames.resolve(this.parties, uuid);
     }
 
-    // ── /realty auction <bidDuration> <paymentDuration> <minBid> <minBidStep> <region> ──
-
-    // ── /realty auction cancel [region] ──
-
-    // ── /realty auction bid <amount> <region> ──
-
-    // ── /realty auction paybid <amount> <region> ──
 }

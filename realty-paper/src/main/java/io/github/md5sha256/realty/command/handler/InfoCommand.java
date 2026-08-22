@@ -90,7 +90,7 @@ public final class InfoCommand implements CommandHandler {
     }
 
     private @NotNull String resolveName(@NotNull UUID uuid) {
-        return PartyNames.resolve(parties, uuid);
+        return PartyNames.resolve(this.parties, uuid);
     }
 
     @Route("info [region]")
@@ -153,7 +153,6 @@ public final class InfoCommand implements CommandHandler {
             return null;
         });
     }
-
 
     private void appendFreeholdInfo(@NotNull TextComponent.Builder builder,
                                 @NotNull FreeholdContractEntity freehold,

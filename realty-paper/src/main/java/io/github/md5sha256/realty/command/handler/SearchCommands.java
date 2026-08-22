@@ -57,7 +57,6 @@ public final class SearchCommands implements CommandHandler {
             return;
         }
         this.dialogs.open(player, SearchDialogHandler.class, this.dialogHandler.newModel(player));
-    
     }
 
     @Route("search results")
@@ -68,10 +67,10 @@ public final class SearchCommands implements CommandHandler {
                         @Flag(value = "leasehold", presence = true) boolean leaseholdFlag,
                         @Flag("tags") @Nullable String tags,
                         @Flag("exclude-tags") @Nullable String excludeTags,
-                        @Flag(value = "min-price", defaultValue = "0") double minPrice,
-                        @Flag("max-price") @Nullable Double maxPriceFlag,
+                        @Flag(value = "min-price", defaultValue = "0", min = 0) double minPrice,
+                        @Flag(value = "max-price", min = 0) @Nullable Double maxPriceFlag,
                         @Flag(value = "occupancy", defaultValue = "UNOCCUPIED") OccupancyFilter occupancy,
-                        @Flag(value = "page", defaultValue = "1") int page) {
+                        @Flag(value = "page", defaultValue = "1", min = 1) int page) {
 
                 boolean includeFreehold = freeholdFlag;
         boolean includeLeasehold = leaseholdFlag;
@@ -85,9 +84,7 @@ public final class SearchCommands implements CommandHandler {
         double maxPrice = maxPriceFlag != null ? maxPriceFlag : Double.MAX_VALUE;
         this.searchResults.performSearch(sender, includeFreehold, includeLeasehold, tagIds,
                 excludedTagIds, minPrice, maxPrice, occupancy, page);
-    
     }
-
 
     @Nullable
     private static Collection<String> parseTagIds(@Nullable String raw) {

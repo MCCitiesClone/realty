@@ -20,7 +20,6 @@ import io.paradaux.hibernia.framework.commander.annotations.Route;
 import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
-import java.util.List;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -120,7 +119,6 @@ public final class TerminateCommands implements CommandHandler {
                                 "error", error.message()));
             }
         });
-    
     }
 
     @Route("terminate cancel [region]")
@@ -167,6 +165,5 @@ public final class TerminateCommands implements CommandHandler {
                             "error", String.valueOf(ex.getMessage())));
                     return null;
                 });
-    
     }
 }

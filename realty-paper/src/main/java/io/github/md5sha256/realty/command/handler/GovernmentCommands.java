@@ -17,9 +17,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-/** The {@code /realty government …} family: registering Treasury governments as parties. */
+/** The {@code /realty government …} family: registering Treasury governments as this.parties. */
 @Command({"realty", "rl"})
 public final class GovernmentCommands implements CommandHandler {
 
@@ -63,7 +62,6 @@ public final class GovernmentCommands implements CommandHandler {
                             "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
-    
     }
 
     @Route("government list")
@@ -86,7 +84,6 @@ public final class GovernmentCommands implements CommandHandler {
                     "account_id", String.valueOf(party.accountId()),
                     "uuid", party.partyUuid().toString()));
         }
-    
     }
 
     @Route("government unregister <name>")
@@ -114,6 +111,5 @@ public final class GovernmentCommands implements CommandHandler {
                             "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
-    
     }
 }

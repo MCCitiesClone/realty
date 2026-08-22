@@ -10,36 +10,17 @@ import io.github.md5sha256.realty.database.entity.SearchResultEntity;
 import io.github.md5sha256.realty.database.mapper.SearchMapper;
 import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.RealtyTags;
-import io.papermc.paper.dialog.Dialog;
-import io.papermc.paper.dialog.DialogResponseView;
-import io.papermc.paper.registry.data.dialog.ActionButton;
-import io.papermc.paper.registry.data.dialog.DialogBase;
-import io.papermc.paper.registry.data.dialog.action.DialogAction;
-import io.papermc.paper.registry.data.dialog.action.DialogActionCallback;
-import io.papermc.paper.registry.data.dialog.body.DialogBody;
-import io.papermc.paper.registry.data.dialog.input.DialogInput;
-import io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput;
-import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.event.ClickCallback;
-import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**

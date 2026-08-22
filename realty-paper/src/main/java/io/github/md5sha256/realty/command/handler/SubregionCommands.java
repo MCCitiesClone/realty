@@ -12,12 +12,10 @@ import io.paradaux.hibernia.framework.commander.annotations.Route;
 import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
-import java.util.List;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /** The {@code /realty subregion …} family: the selection wand and its confirmation. */
 @Command({"realty", "rl"})
@@ -52,7 +50,6 @@ public final class SubregionCommands implements CommandHandler {
         player.getInventory().addItem(item).forEach((index, leftover) ->
                 player.getWorld().dropItem(player.getLocation(), leftover));
         player.sendMessage(this.messages.component(MessageKeys.SUBREGION_WAND_GIVEN));
-    
     }
 
     @Route("subregion clear")
@@ -70,7 +67,6 @@ public final class SubregionCommands implements CommandHandler {
         }
         this.wandManager.clear(player.getUniqueId());
         player.sendMessage(this.messages.component(MessageKeys.SUBREGION_SELECTION_CLEARED));
-    
     }
 
     @Route("subregion confirm")
@@ -83,6 +79,5 @@ public final class SubregionCommands implements CommandHandler {
             return;
         }
         this.flow.openHeight(player);
-    
     }
 }

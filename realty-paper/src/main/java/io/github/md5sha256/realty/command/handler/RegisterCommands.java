@@ -9,7 +9,6 @@ import io.github.md5sha256.realty.command.resolver.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.command.util.NamedAuthority;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.settings.Settings;
 import io.paradaux.hibernia.framework.commander.annotations.Arg;
 import io.paradaux.hibernia.framework.commander.annotations.Command;
@@ -22,7 +21,6 @@ import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
 import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.command.CommandSender;
@@ -42,28 +40,25 @@ public final class RegisterCommands implements CommandHandler {
     private final AtomicReference<Settings> settings;
     private final Message messages;
     private final RealtyEventDispatch events;
-    private final PartyService parties;
 
     @Inject
     public RegisterCommands(@NotNull RealtyPaperApi api,
                             @NotNull AtomicReference<Settings> settings,
                             @NotNull Message messages,
-                            @NotNull RealtyEventDispatch events,
-                            @NotNull PartyService parties) {
+                            @NotNull RealtyEventDispatch events) {
         this.api = api;
         this.settings = settings;
         this.messages = messages;
         this.events = events;
-        this.parties = parties;
     }
 
     @Route("register leasehold <price> <period> <maxrenewals> [region]")
     @Permission("realty.command.register.leasehold")
     @Description("Register a region as a leasehold")
     public void leasehold(@Sender CommandSender sender,
-                          @Arg("price") double price,
+                          @Arg(value = "price", min = 0.01) double price,
                           @Arg("period") Duration period,
-                          @Arg("maxrenewals") int maxExtensions,
+                          @Arg(value = "maxrenewals", min = -1) int maxExtensions,
                           @Flag("landlord") @Nullable NamedAuthority landlordFlag,
                           @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
         UUID landlord = landlordFlag != null ? landlordFlag.uuid()
@@ -102,14 +97,13 @@ public final class RegisterCommands implements CommandHandler {
                             "error", cause.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("register freehold [region]")
     @Permission("realty.command.register.freehold")
     @Description("Register a region as a freehold")
     public void freehold(@Sender CommandSender sender,
-                         @Flag("price") @Nullable Double priceFlag,
+                         @Flag(value = "price", min = 0.01) @Nullable Double priceFlag,
                          @Flag("titleholder") @Nullable NamedAuthority titleHolderFlag,
                          @Flag("authority") @Nullable NamedAuthority authorityFlag,
                          @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
@@ -153,6 +147,5 @@ public final class RegisterCommands implements CommandHandler {
                             "error", cause.getMessage()));
                     return null;
                 });
-    
     }
 }

@@ -14,13 +14,11 @@ import io.paradaux.hibernia.framework.commander.annotations.Route;
 import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /** Handles {@code /realty cleanup tags}. */
 @Command({"realty", "rl"})
@@ -68,6 +66,5 @@ public final class CleanupCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         }, this.executorState.dbExec());
-    
     }
 }

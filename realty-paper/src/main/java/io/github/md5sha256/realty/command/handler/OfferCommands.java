@@ -69,7 +69,7 @@ public final class OfferCommands implements CommandHandler {
     @Permission("realty.command.offer.send")
     @Description("Offer to buy a region")
     public void send(@Sender CommandSender rawSender,
-                     @Arg("price") double price,
+                     @Arg(value = "price", min = 0.01) double price,
                      @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
 
         if (!(rawSender instanceof Player sender)) {
@@ -126,7 +126,6 @@ public final class OfferCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("offer inbox")
@@ -177,7 +176,6 @@ public final class OfferCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         });
-    
     }
 
     @Route("offer outbox")
@@ -223,7 +221,6 @@ public final class OfferCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         });
-    
     }
 
     @Route("offer accept <player> [region]")
@@ -289,14 +286,13 @@ public final class OfferCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("offer pay <amount> [region]")
     @Permission("realty.command.offer.pay")
     @Description("Pay for an accepted offer")
     public void pay(@Sender CommandSender rawSender,
-                    @Arg("amount") double amount,
+                    @Arg(value = "amount", min = 0) double amount,
                     @OptionalArg("region") @Nullable WorldGuardRegion namedRegion) {
 
         if (!(rawSender instanceof Player sender)) {
@@ -350,7 +346,6 @@ public final class OfferCommands implements CommandHandler {
                                 "error", error.message()));
             }
         });
-    
     }
 
     @Route("offer withdraw [region]")
@@ -395,7 +390,6 @@ public final class OfferCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("offer reject <player> [region]")
@@ -452,7 +446,6 @@ public final class OfferCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("offer rejectall [region]")
@@ -502,7 +495,6 @@ public final class OfferCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("offer toggle <enabled> [region]")
@@ -546,16 +538,9 @@ public final class OfferCommands implements CommandHandler {
                             "error", ex.getMessage()));
                     return null;
                 });
-    
     }
 
     
-
-    // ── /realty offer send <price> <region> ──
-
-    // ── /realty offer outbox ──
-
-    // ── /realty offer inbox ──
 
     /**
      * Collects the inbound offers addressed to the sender and to every government they may act for.
@@ -577,15 +562,4 @@ public final class OfferCommands implements CommandHandler {
                 });
     }
 
-    // ── /realty offer accept <player> <region> ──
-
-    // ── /realty offer pay <amount> <region> ──
-
-    // ── /realty offer withdraw [region] ──
-
-    // ── /realty offer reject <player> [region] ──
-
-    // ── /realty offer rejectall [region] ──
-
-    // ── /realty offer toggle <yes/no> [region] ──
 }

@@ -3,7 +3,6 @@ package io.github.md5sha256.realty.command.handler;
 import com.google.inject.Inject;
 import com.minecraftcitiesnetwork.pluginInfrastructure.util.DateFormatter;
 import io.github.md5sha256.realty.api.CurrencyFormatter;
-import io.github.md5sha256.realty.api.DateTimeFormatters;
 import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.HistoryEventType;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
@@ -98,7 +97,7 @@ public final class HistoryCommand implements CommandHandler {
                         @Flag("event") @Nullable HistoryEventType eventType,
                         @Flag("time") @Nullable Duration timeDuration,
                         @Flag("player") @Nullable NamedAuthority player,
-                        @Flag(value = "page", defaultValue = "1") int page) {
+                        @Flag(value = "page", defaultValue = "1", min = 1) int page) {
         WorldGuardRegion region = namedRegion != null ? namedRegion
                 : (sender instanceof Player standing
                         ? WorldGuardRegionResolver.regionAt(standing.getLocation()) : null);
@@ -243,6 +242,6 @@ public final class HistoryCommand implements CommandHandler {
     }
 
     private @NotNull String resolveName(@NotNull UUID uuid) {
-        return PartyNames.resolve(parties, uuid);
+        return PartyNames.resolve(this.parties, uuid);
     }
 }

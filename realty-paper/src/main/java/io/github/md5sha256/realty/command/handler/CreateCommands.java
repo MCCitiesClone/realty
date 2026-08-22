@@ -22,7 +22,6 @@ import io.github.md5sha256.realty.api.event.RegionCreatedEvent;
 import io.github.md5sha256.realty.command.util.NamedAuthority;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.settings.Settings;
 import io.paradaux.hibernia.framework.commander.annotations.Arg;
 import io.paradaux.hibernia.framework.commander.annotations.Command;
@@ -34,7 +33,6 @@ import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
 import java.time.Duration;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -58,19 +56,16 @@ public final class CreateCommands implements CommandHandler {
     private final AtomicReference<Settings> settings;
     private final Message messages;
     private final RealtyEventDispatch events;
-    private final PartyService parties;
 
     @Inject
     public CreateCommands(@NotNull RealtyPaperApi api,
                           @NotNull AtomicReference<Settings> settings,
                           @NotNull Message messages,
-                          @NotNull RealtyEventDispatch events,
-                          @NotNull PartyService parties) {
+                          @NotNull RealtyEventDispatch events) {
         this.api = api;
         this.settings = settings;
         this.messages = messages;
         this.events = events;
-        this.parties = parties;
     }
 
     @Route("create leasehold <name> <price> <period> <maxextensions>")
@@ -78,9 +73,9 @@ public final class CreateCommands implements CommandHandler {
     @Description("Create a region from your selection and list it for lease")
     public void leasehold(@Sender CommandSender rawSender,
                           @Arg("name") String name,
-                          @Arg("price") double price,
+                          @Arg(value = "price", min = 0.01) double price,
                           @Arg("period") Duration period,
-                          @Arg("maxextensions") int maxExtensions,
+                          @Arg(value = "maxextensions", min = -1) int maxExtensions,
                           @Flag("landlord") @Nullable NamedAuthority landlordFlag) {
 
         if (!(rawSender instanceof Player player)) {
@@ -145,7 +140,6 @@ public final class CreateCommands implements CommandHandler {
                             "error", cause.getMessage()));
                     return null;
                 });
-    
     }
 
     @Route("create freehold <name>")
@@ -153,7 +147,7 @@ public final class CreateCommands implements CommandHandler {
     @Description("Create a region from your selection and list it for sale")
     public void freehold(@Sender CommandSender rawSender,
                          @Arg("name") String name,
-                         @Flag("price") @Nullable Double priceFlag,
+                         @Flag(value = "price", min = 0.01) @Nullable Double priceFlag,
                          @Flag("titleholder") @Nullable NamedAuthority titleHolderFlag,
                          @Flag("authority") @Nullable NamedAuthority authorityFlag) {
 
@@ -222,7 +216,6 @@ public final class CreateCommands implements CommandHandler {
                             "error", cause.getMessage()));
                     return null;
                 });
-    
     }
 
     private static final Pattern VALID_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9-]+$");

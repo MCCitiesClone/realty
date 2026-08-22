@@ -327,7 +327,15 @@ class CommandRegistrationTest {
                 "tp <region>", "info [region]", "history [region]", "version", "reload",
                 "agent invite <player> [region]", "agent invite accept [region]",
                 "agent invite reject [region]", "agent invite withdraw <player> [region]",
-                "agent remove <player> [region]")) {
+                "agent remove <player> [region]",
+                // A root-level alias rather than a subcommand of list, as the Cloud tree had it.
+                "me",
+                "list", "list owned", "list rented",
+                "auction bid <bid> [region]", "offer send <price> [region]",
+                "set price <price> [region]", "modify price <price> [region]",
+                "create freehold <name>", "register freehold [region]",
+                "search", "search results", "help", "help <category>",
+                "sign place <region>", "terminate [region]", "terminate cancel [region]")) {
             Assertions.assertTrue(patterns.contains(expected),
                     "route disappeared in the port: '" + expected + "' (have " + patterns + ")");
         }

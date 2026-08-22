@@ -7,7 +7,6 @@ import io.github.md5sha256.realty.command.util.NamedAuthority;
 import io.github.md5sha256.realty.database.entity.LeaseholdContractEntity;
 import io.github.md5sha256.realty.database.entity.RealtyRegionEntity;
 import io.github.md5sha256.realty.localisation.MessageKeys;
-import io.github.md5sha256.realty.party.PartyService;
 import io.paradaux.hibernia.framework.commander.annotations.Command;
 import io.paradaux.hibernia.framework.commander.annotations.Description;
 import io.paradaux.hibernia.framework.commander.annotations.Flag;
@@ -34,15 +33,12 @@ public final class ListCommands implements CommandHandler {
 
     private final RealtyPaperApi api;
     private final Message messages;
-    private final PartyService parties;
 
     @Inject
     public ListCommands(@NotNull RealtyPaperApi api,
-                        @NotNull Message messages,
-                        @NotNull PartyService parties) {
+                        @NotNull Message messages) {
         this.api = api;
         this.messages = messages;
-        this.parties = parties;
     }
 
     @Route("list")
@@ -50,7 +46,7 @@ public final class ListCommands implements CommandHandler {
     @Description("List the regions you hold")
     public void list(@Sender CommandSender sender,
                      @Flag("player") @Nullable NamedAuthority player,
-                     @Flag(value = "page", defaultValue = "1") int page) {
+                     @Flag(value = "page", defaultValue = "1", min = 1) int page) {
         show(sender, player, null, page);
     }
 
@@ -59,7 +55,7 @@ public final class ListCommands implements CommandHandler {
     @Description("List the freeholds you hold")
     public void listOwned(@Sender CommandSender sender,
                           @Flag("player") @Nullable NamedAuthority player,
-                          @Flag(value = "page", defaultValue = "1") int page) {
+                          @Flag(value = "page", defaultValue = "1", min = 1) int page) {
         show(sender, player, "owned", page);
     }
 
@@ -68,17 +64,18 @@ public final class ListCommands implements CommandHandler {
     @Description("List the regions you rent")
     public void listRented(@Sender CommandSender sender,
                            @Flag("player") @Nullable NamedAuthority player,
-                           @Flag(value = "page", defaultValue = "1") int page) {
+                           @Flag(value = "page", defaultValue = "1", min = 1) int page) {
         show(sender, player, "rented", page);
     }
 
-    @Route("list me")
+    @Route("me")
     @Permission("realty.command.list")
     @Description("List the regions you hold")
     public void listMe(@Sender CommandSender rawSender,
-                       @Flag(value = "page", defaultValue = "1") int page) {
-        // The proxy the Cloud tree spelled by injecting a --player flag pointing at the sender.
-        // Stated directly here instead: /realty list me is /realty list --player <you>.
+                       @Flag(value = "page", defaultValue = "1", min = 1) int page) {
+        // A root-level alias, not a subcommand of list: the Cloud tree built it from the root
+        // builder rather than from the list literal, so it was /realty me all along. It spelled
+        // itself by injecting a --player flag pointing at the sender; stated directly here.
         if (!(rawSender instanceof Player player)) {
             rawSender.sendMessage(this.messages.component(MessageKeys.LIST_PLAYERS_ONLY));
             return;
@@ -104,11 +101,6 @@ public final class ListCommands implements CommandHandler {
     }
 
     private static final int PAGE_SIZE = 10;
-
-    private void resolvePlayer(@NotNull CommandSender sender, @NotNull NamedAuthority authority,
-                               @Nullable String category, int page) {
-        listRegions(sender, authority.uuid(), authority.name(), category, page);
-    }
 
     private void listRegions(@NotNull CommandSender sender, @NotNull UUID targetId,
                              @NotNull String targetName, @Nullable String category, int page) {

@@ -17,10 +17,8 @@ import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /** The {@code /realty module …} family: listing and reloading module jars. */
 @Command({"realty", "rl"})
@@ -59,7 +57,6 @@ public final class ModuleCommands implements CommandHandler {
                         "reloadable", String.valueOf(module.manifest().reloadable())));
             }
         });
-    
     }
 
     @Route("module reload <module>")
@@ -81,7 +78,6 @@ public final class ModuleCommands implements CommandHandler {
                             "module", moduleName,
                             "error", describe(cause)));
                 }));
-    
     }
 
     

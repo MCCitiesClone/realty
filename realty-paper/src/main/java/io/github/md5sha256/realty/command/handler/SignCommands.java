@@ -107,7 +107,6 @@ public final class SignCommands implements CommandHandler {
                             "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
-    
     }
 
     @Route("sign remove")
@@ -151,7 +150,6 @@ public final class SignCommands implements CommandHandler {
                             "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
-    
     }
 
     @Route("sign list [region]")
@@ -194,7 +192,6 @@ public final class SignCommands implements CommandHandler {
                             "error", String.valueOf(cause.getMessage())));
                     return null;
                 });
-    
     }
 
     

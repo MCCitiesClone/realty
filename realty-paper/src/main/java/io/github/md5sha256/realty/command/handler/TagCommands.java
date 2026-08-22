@@ -100,7 +100,6 @@ public final class TagCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         }, this.executorState.dbExec());
-    
     }
 
     @Route("tag remove <tag> [region]")
@@ -147,7 +146,6 @@ public final class TagCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         }, this.executorState.dbExec());
-    
     }
 
     @Route("tag clear [region]")
@@ -180,7 +178,6 @@ public final class TagCommands implements CommandHandler {
                         "error", ex.getMessage()));
             }
         }, this.executorState.dbExec());
-    
     }
 
     @Route("tag list")
@@ -204,6 +201,5 @@ public final class TagCommands implements CommandHandler {
                     "display", tag.tagDisplayName()));
         }
         sender.sendMessage(builder.build());
-    
     }
 }

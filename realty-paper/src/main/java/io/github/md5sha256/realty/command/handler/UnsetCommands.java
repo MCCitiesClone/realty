@@ -14,7 +14,6 @@ import io.paradaux.hibernia.framework.commander.annotations.Route;
 import io.paradaux.hibernia.framework.commander.annotations.Sender;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.i18n.Message;
-import java.util.List;
 import java.util.UUID;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -75,7 +74,6 @@ public final class UnsetCommands implements CommandHandler {
                                 "region", regionId));
             }
         });
-    
     }
 
     @Route("unset titleholder [region]")
@@ -114,7 +112,6 @@ public final class UnsetCommands implements CommandHandler {
                                 "error", error.message()));
             }
         });
-    
     }
 
     @Route("unset tenant [region]")
@@ -153,6 +150,5 @@ public final class UnsetCommands implements CommandHandler {
                                 "error", error.message()));
             }
         });
-    
     }
 }
