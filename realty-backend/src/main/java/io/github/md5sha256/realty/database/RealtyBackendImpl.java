@@ -204,9 +204,17 @@ public class RealtyBackendImpl implements RealtyBackend {
                               double minBidStep) {
         try (SqlSessionWrapper wrapper = database.openSession();
              SqlSession session = wrapper.session()) {
-            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegion(worldGuardRegionId, worldId);
+            // Lock the freehold row (the per-region serialization point) so the
+            // offers-exist check cannot race a concurrent placeOffer, which performs the
+            // mirror check under the same lock. Without it both sides pass their snapshot
+            // read and commit, leaving the region with an offer and an auction at once.
+            FreeholdContractEntity freehold = wrapper.freeholdContractMapper()
+                    .selectByRegionForUpdate(worldGuardRegionId, worldId);
             if (freehold == null) {
                 return new CreateAuctionResult.NoFreeholdContract();
+            }
+            if (wrapper.freeholdContractOfferMapper().existsByRegion(worldGuardRegionId, worldId)) {
+                return new CreateAuctionResult.OffersExist();
             }
             if (!auctioneerId.equals(freehold.authorityId())
                     && !auctioneerId.equals(freehold.titleHolderId())
@@ -1389,13 +1397,16 @@ public class RealtyBackendImpl implements RealtyBackend {
                                                        @NotNull UUID worldId,
                                                        @NotNull UUID offererId) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
-            if (!wrapper.freeholdContractOfferMapper().existsByOfferer(worldGuardRegionId, worldId, offererId)) {
+            // Lock the freehold row (per-region serialization point) so the offer-exists and
+            // accepted-payment checks cannot race a concurrent accept before the delete.
+            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegionForUpdate(worldGuardRegionId, worldId);
+            if (freehold == null
+                    || !wrapper.freeholdContractOfferMapper().existsByOfferer(worldGuardRegionId, worldId, offererId)) {
                 return new WithdrawOfferResult.NoOffer();
             }
             if (wrapper.freeholdContractOfferPaymentMapper().existsByRegion(worldGuardRegionId, worldId)) {
                 return new WithdrawOfferResult.OfferAccepted();
             }
-            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegion(worldGuardRegionId, worldId);
             wrapper.freeholdContractOfferMapper().deleteOfferByOfferer(worldGuardRegionId, worldId, offererId);
             wrapper.session().commit();
             return new WithdrawOfferResult.Success(freehold.titleHolderId());
@@ -1411,7 +1422,9 @@ public class RealtyBackendImpl implements RealtyBackend {
                                                       @NotNull UUID callerId,
                                                       @NotNull UUID offererId) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
-            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegion(worldGuardRegionId, worldId);
+            // Lock the freehold row (per-region serialization point) so the offer's
+            // existence and accepted-payment checks cannot race a concurrent accept/pay.
+            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegionForUpdate(worldGuardRegionId, worldId);
             if (freehold == null) {
                 return new RejectOfferResult.NoOffer();
             }
@@ -1443,7 +1456,9 @@ public class RealtyBackendImpl implements RealtyBackend {
                                                               @NotNull UUID callerId) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
             FreeholdContractMapper freeholdMapper = wrapper.freeholdContractMapper();
-            FreeholdContractEntity freehold = freeholdMapper.selectByRegion(worldGuardRegionId, worldId);
+            // Lock the freehold row (per-region serialization point) so the accepted-payment
+            // check cannot race a concurrent accept/pay before the bulk delete.
+            FreeholdContractEntity freehold = freeholdMapper.selectByRegionForUpdate(worldGuardRegionId, worldId);
             if (freehold == null) {
                 return new RejectAllOffersResult.NoFreeholdContract();
             }
@@ -1480,7 +1495,10 @@ public class RealtyBackendImpl implements RealtyBackend {
             FreeholdContractOfferMapper offerMapper = wrapper.freeholdContractOfferMapper();
             FreeholdContractAuctionMapper auctionMapper = wrapper.freeholdContractAuctionMapper();
 
-            FreeholdContractEntity freehold = freeholdMapper.selectByRegion(worldGuardRegionId, worldId);
+            // Lock the freehold row for this transaction: the per-region serialization
+            // point for the offer lifecycle, so concurrent offer operations (possibly in
+            // another process) cannot interleave their checks and mutations.
+            FreeholdContractEntity freehold = freeholdMapper.selectByRegionForUpdate(worldGuardRegionId, worldId);
             if (freehold == null) {
                 return new OfferResult.NoFreeholdContract();
             }
@@ -1549,7 +1567,9 @@ public class RealtyBackendImpl implements RealtyBackend {
             FreeholdContractOfferPaymentMapper paymentMapper = wrapper.freeholdContractOfferPaymentMapper();
             FreeholdContractAuctionMapper auctionMapper = wrapper.freeholdContractAuctionMapper();
 
-            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegion(worldGuardRegionId, worldId);
+            // Lock the freehold row first (per-region serialization point) so a concurrent
+            // place/pay/withdraw/reject on this region cannot interleave with acceptance.
+            FreeholdContractEntity freehold = wrapper.freeholdContractMapper().selectByRegionForUpdate(worldGuardRegionId, worldId);
             if (freehold == null) {
                 return new AcceptOfferResult.NoOffer();
             }
@@ -1591,6 +1611,11 @@ public class RealtyBackendImpl implements RealtyBackend {
                                              @NotNull UUID offererId,
                                              double amount) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
+            // Lock the freehold row first (per-region serialization point) so the payment
+            // read-and-increment cannot interleave with accept/finalize on the same region.
+            // The Vault transfer happens in the paper layer, outside this lock.
+            FreeholdContractMapper freeholdMapper = wrapper.freeholdContractMapper();
+            FreeholdContractEntity freehold = freeholdMapper.selectByRegionForUpdate(worldGuardRegionId, worldId);
             FreeholdContractOfferPaymentMapper paymentMapper = wrapper.freeholdContractOfferPaymentMapper();
             FreeholdContractOfferPaymentEntity payment = paymentMapper.selectByRegion(worldGuardRegionId, worldId);
             if (payment == null || !payment.offererId().equals(offererId)) {
@@ -1607,8 +1632,6 @@ public class RealtyBackendImpl implements RealtyBackend {
             if (updated == 0) {
                 return new PayOfferResult.NoPaymentRecord();
             }
-            FreeholdContractMapper freeholdMapper = wrapper.freeholdContractMapper();
-            FreeholdContractEntity freehold = freeholdMapper.selectByRegion(worldGuardRegionId, worldId);
             UUID authorityId = freehold.authorityId();
             UUID titleHolderId = freehold.titleHolderId();
             // Record the payment only. Ownership transfer is DEFERRED to
@@ -1628,16 +1651,18 @@ public class RealtyBackendImpl implements RealtyBackend {
                                       @NotNull UUID worldId,
                                       @NotNull UUID offererId) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
+            // Lock the freehold row first (per-region serialization point) so finalisation
+            // cannot interleave with a concurrent pay/reject/withdraw on the same region.
+            FreeholdContractMapper freeholdMapper = wrapper.freeholdContractMapper();
+            FreeholdContractEntity freehold = freeholdMapper.selectByRegionForUpdate(worldGuardRegionId, worldId);
             FreeholdContractOfferPaymentMapper paymentMapper = wrapper.freeholdContractOfferPaymentMapper();
             FreeholdContractOfferPaymentEntity payment = paymentMapper.selectByRegion(worldGuardRegionId, worldId);
             // Only finalize a real, fully-paid record for this offerer. Idempotent:
             // a second call (or one after rollback) finds nothing/under-paid and no-ops.
-            if (payment == null || !payment.offererId().equals(offererId)
+            if (freehold == null || payment == null || !payment.offererId().equals(offererId)
                     || payment.currentPayment() < payment.offerPrice() - PAYMENT_EPSILON) {
                 return;
             }
-            FreeholdContractMapper freeholdMapper = wrapper.freeholdContractMapper();
-            FreeholdContractEntity freehold = freeholdMapper.selectByRegion(worldGuardRegionId, worldId);
             freeholdMapper.updateFreeholdByRegion(worldGuardRegionId, worldId, payment.offerPrice(), offererId);
             freeholdMapper.updatePriceByRegion(worldGuardRegionId, worldId, null);
             paymentMapper.deleteByRegion(worldGuardRegionId, worldId);
@@ -1655,6 +1680,9 @@ public class RealtyBackendImpl implements RealtyBackend {
                                   @NotNull UUID offererId,
                                   double amount) {
         try (SqlSessionWrapper wrapper = database.openSession()) {
+            // Lock the freehold row (per-region serialization point) so the payment
+            // read-and-decrement cannot interleave with accept/finalize on the same region.
+            wrapper.freeholdContractMapper().selectByRegionForUpdate(worldGuardRegionId, worldId);
             FreeholdContractOfferPaymentMapper paymentMapper = wrapper.freeholdContractOfferPaymentMapper();
             FreeholdContractOfferPaymentEntity payment = paymentMapper.selectByRegion(worldGuardRegionId, worldId);
             if (payment != null && payment.offererId().equals(offererId)) {
@@ -1835,7 +1863,8 @@ public class RealtyBackendImpl implements RealtyBackend {
                 RealtyRegionEntity region = wrapper.realtyRegionMapper().selectById(payment.realtyRegionId());
                 paymentMapper.deleteByBidId(payment.bidId());
                 String regionName = region != null ? region.worldGuardRegionId() : "unknown";
-                refunds.add(new ExpiredBidPayment(payment.bidderId(), payment.currentPayment(), regionName));
+                UUID worldId = region != null ? region.worldId() : null;
+                refunds.add(new ExpiredBidPayment(payment.bidderId(), payment.currentPayment(), regionName, worldId));
                 FreeholdContractAuctionEntity auction = auctionMapper.selectById(payment.freeholdContractAuctionId());
                 if (auction != null) {
                     LocalDateTime nextDeadline = LocalDateTime.now().plusSeconds(auction.paymentDurationSeconds());
@@ -1866,7 +1895,8 @@ public class RealtyBackendImpl implements RealtyBackend {
                 wrapper.freeholdContractOfferPaymentMapper().deleteByOfferId(payment.offerId());
                 wrapper.session().commit();
                 String regionName = region != null ? region.worldGuardRegionId() : "unknown";
-                refunds.add(new ExpiredOfferPayment(payment.offererId(), payment.currentPayment(), regionName));
+                UUID worldId = region != null ? region.worldId() : null;
+                refunds.add(new ExpiredOfferPayment(payment.offererId(), payment.currentPayment(), regionName, worldId));
             }
         }
         return refunds;
