@@ -752,7 +752,8 @@ public final class Realty extends JavaPlugin {
         }
     }
 
-    private void performReload() throws IOException {
+    /** Re-reads every configuration file and refreshes the derived state. Driven by {@code /realty reload}. */
+    public void performReload() throws IOException {
         // One re-read of every file, then a single atomic swap of the whole component set, so a
         // command running mid-reload never sees settings from one file paired with tags from
         // another. The AtomicReferences below are re-pointed at the new snapshot; consumers hold
