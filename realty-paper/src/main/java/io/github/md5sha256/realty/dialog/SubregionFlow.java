@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -375,7 +376,7 @@ public final class SubregionFlow {
 
     static String durationSummary(@NotNull SubregionState state) {
         return state.durationAmount + " "
-                + durationUnitOf(state).label.toLowerCase(java.util.Locale.ROOT);
+                + durationUnitOf(state).label.toLowerCase(Locale.ROOT);
     }
 
     static double parsePrice(String text) {

@@ -19,7 +19,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 
 /**
@@ -134,6 +138,8 @@ class MessageRenderingEquivalenceTest {
         Component rendered = MiniMessage.miniMessage().deserialize(raw);
         ClickEvent click = rendered.clickEvent();
         Assertions.assertNotNull(click, "the rendered nav link has no click event");
+        // value() is deprecated in newer Adventure, but its replacement is not in the
+        // Paper API this targets.
         Assertions.assertEquals("/realty list --page 2", click.value());
     }
 
@@ -149,9 +155,9 @@ class MessageRenderingEquivalenceTest {
     @Test
     @DisplayName("every bundled key resolves to something other than the key itself")
     void everyKeyResolves() throws Exception {
-        java.util.List<String> unresolved = new java.util.ArrayList<>();
-        for (java.lang.reflect.Field field : MessageKeys.class.getDeclaredFields()) {
-            if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())
+        List<String> unresolved = new ArrayList<>();
+        for (Field field : MessageKeys.class.getDeclaredFields()) {
+            if (!Modifier.isStatic(field.getModifiers())
                     || field.getType() != String.class) {
                 continue;
             }
