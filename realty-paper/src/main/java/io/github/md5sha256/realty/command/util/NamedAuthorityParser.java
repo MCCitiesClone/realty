@@ -24,8 +24,9 @@ import java.util.concurrent.CompletableFuture;
  * Like {@link AuthorityParser}, but keeps the name the sender typed alongside the resolved UUID so
  * a command can echo it back without a second lookup.
  *
- * <p>{@link #party(PartyService)} additionally accepts {@code gov:<Name>}, in which case the
- * captured name is the government's display name.
+ * <p>{@link #party(PartyService)} additionally accepts a registered government's name, or
+ * {@code gov.<Name>} to force one, in which case the captured name is the government's display
+ * name.
  */
 public class NamedAuthorityParser implements ArgumentParser<Source, NamedAuthority> {
 
@@ -43,7 +44,8 @@ public class NamedAuthorityParser implements ArgumentParser<Source, NamedAuthori
     }
 
     /**
-     * Accepts a player name, or {@code gov:<Name>} naming a registered government.
+     * Accepts a player name, a registered government's name, or {@code gov.<Name>} to force the
+     * latter.
      */
     public static @NotNull ParserDescriptor<Source, NamedAuthority> party(@NotNull PartyService partyService) {
         return ParserDescriptor.of(new NamedAuthorityParser(partyService), NamedAuthority.class);
@@ -55,14 +57,13 @@ public class NamedAuthorityParser implements ArgumentParser<Source, NamedAuthori
             @NotNull CommandInput input
     ) {
         String name = input.readString();
-        if (partyService != null && name.regionMatches(true, 0, AuthorityParser.GOVERNMENT_PREFIX, 0,
-                AuthorityParser.GOVERNMENT_PREFIX.length())) {
-            String governmentName = name.substring(AuthorityParser.GOVERNMENT_PREFIX.length());
-            return partyService.partyByName(governmentName)
+        String forced = AuthorityParser.governmentNameIfPrefixed(name);
+        if (partyService != null && forced != null) {
+            return partyService.partyByName(forced)
                     .map(party -> ArgumentParseResult.success(
                             new NamedAuthority(party.partyUuid(), party.displayName())))
-                    .orElseGet(() -> ArgumentParseResult.failure(new IllegalArgumentException(
-                            "No registered government named '" + governmentName
+                    .orElseGet(() -> ArgumentParseResult.<NamedAuthority>failure(
+                            new IllegalArgumentException("No registered government named '" + forced
                                     + "'. Register it first with /realty government register <name>.")));
         }
         Player onlinePlayer = Bukkit.getPlayerExact(name);
@@ -71,12 +72,19 @@ public class NamedAuthorityParser implements ArgumentParser<Source, NamedAuthori
                     new NamedAuthority(onlinePlayer.getUniqueId(), onlinePlayer.getName()));
         }
         OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayerIfCached(name);
-        if (offlinePlayer == null || !offlinePlayer.hasPlayedBefore()) {
-            return ArgumentParseResult.failure(
-                    new IllegalArgumentException("Player not found: " + name));
+        if (offlinePlayer != null && offlinePlayer.hasPlayedBefore()) {
+            return ArgumentParseResult.success(
+                    new NamedAuthority(offlinePlayer.getUniqueId(), offlinePlayer.getName()));
         }
-        return ArgumentParseResult.success(
-                new NamedAuthority(offlinePlayer.getUniqueId(), offlinePlayer.getName()));
+        if (partyService != null) {
+            var party = partyService.partyByName(name);
+            if (party.isPresent()) {
+                return ArgumentParseResult.success(
+                        new NamedAuthority(party.get().partyUuid(), party.get().displayName()));
+            }
+        }
+        return ArgumentParseResult.failure(
+                new IllegalArgumentException("No player or registered government named: " + name));
     }
 
     @Override
@@ -88,8 +96,7 @@ public class NamedAuthorityParser implements ArgumentParser<Source, NamedAuthori
             }
             if (partyService != null) {
                 for (GovernmentPartyEntity party : partyService.parties()) {
-                    suggestions.add(Suggestion.suggestion(
-                            AuthorityParser.GOVERNMENT_PREFIX + PartyService.commandName(party)));
+                    suggestions.add(Suggestion.suggestion(PartyService.commandName(party)));
                 }
             }
             return CompletableFuture.completedFuture(suggestions);
