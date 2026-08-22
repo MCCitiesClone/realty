@@ -1,7 +1,7 @@
 package io.github.md5sha256.realty.command.handler;
 
 import com.google.inject.Inject;
-import io.github.md5sha256.realty.command.SubregionDialog;
+import io.github.md5sha256.realty.dialog.SubregionFlow;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
@@ -25,17 +25,17 @@ public final class SubregionCommands implements CommandHandler {
 
     private final SubregionWand wand;
     private final SubregionWandManager wandManager;
-    private final SubregionDialog dialog;
+    private final SubregionFlow flow;
     private final Message messages;
 
     @Inject
     public SubregionCommands(@NotNull SubregionWand wand,
                              @NotNull SubregionWandManager wandManager,
-                             @NotNull SubregionDialog dialog,
+                             @NotNull SubregionFlow flow,
                              @NotNull Message messages) {
         this.wand = wand;
         this.wandManager = wandManager;
-        this.dialog = dialog;
+        this.flow = flow;
         this.messages = messages;
     }
 
@@ -82,7 +82,7 @@ public final class SubregionCommands implements CommandHandler {
             sender.sendMessage(this.messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
-        this.dialog.openHeight(player);
+        this.flow.openHeight(player);
     
     }
 }

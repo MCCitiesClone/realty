@@ -34,6 +34,7 @@ import io.paradaux.hibernia.framework.commander.RouteInfo;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
 import io.paradaux.hibernia.framework.commander.spi.ParameterResolver;
 import io.paradaux.hibernia.framework.i18n.Message;
+import io.paradaux.hibernia.framework.usher.DialogManager;
 import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
@@ -174,6 +175,9 @@ class CommandRegistrationTest {
             bind(SafeLocationFinder.class).toInstance(Mockito.mock(SafeLocationFinder.class));
             bind(SubregionWand.class).toInstance(Mockito.mock(SubregionWand.class));
             bind(SubregionWandManager.class).toInstance(Mockito.mock(SubregionWandManager.class));
+            // The dialog tier is not what this test registers; a stub keeps its wiring out of
+            // the way of the command tree.
+            bind(DialogManager.class).toInstance(Mockito.mock(DialogManager.class));
             bind(new TypeLiteral<ModuleLifecycleManager<Realty>>() {
             }).toInstance(Mockito.mock(ModuleLifecycleManager.class));
             bind(new TypeLiteral<AtomicReference<Settings>>() {

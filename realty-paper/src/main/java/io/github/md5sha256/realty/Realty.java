@@ -50,6 +50,8 @@ import io.github.md5sha256.realty.settings.Settings;
 import io.github.md5sha256.realty.settings.TaxSettings;
 import io.github.md5sha256.realty.util.SquirrelIdUsernameResolver;
 import io.github.md5sha256.realty.command.RealtyCommands;
+import io.github.md5sha256.realty.dialog.SearchDialogHandler;
+import io.github.md5sha256.realty.dialog.SubregionDialogHandler;
 import io.github.md5sha256.realty.listener.RealtyListeners;
 import io.paradaux.hibernia.framework.commander.CommandManager;
 import io.paradaux.hibernia.framework.configurator.ConfigurationLoader;
@@ -213,6 +215,7 @@ public final class Realty extends JavaPlugin {
                     .handlers(RealtyCommands.handlers())
                     .resolvers(RealtyCommands.resolvers())
                     .listeners(RealtyListeners.listeners())
+                    .dialogs(SearchDialogHandler.class, SubregionDialogHandler.class)
                     .build();
             this.databaseSettings = this.hibernia.configuration(DatabaseSettings.class);
             this.settings.set(this.hibernia.configuration(Settings.class));

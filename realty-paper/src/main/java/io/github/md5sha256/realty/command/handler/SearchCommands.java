@@ -1,7 +1,9 @@
 package io.github.md5sha256.realty.command.handler;
 
 import com.google.inject.Inject;
-import io.github.md5sha256.realty.command.SearchDialog;
+import io.github.md5sha256.realty.dialog.SearchDialogHandler;
+import io.github.md5sha256.realty.dialog.SearchResults;
+import io.paradaux.hibernia.framework.usher.DialogManager;
 import io.github.md5sha256.realty.database.entity.OccupancyFilter;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.paradaux.hibernia.framework.commander.annotations.Command;
@@ -29,13 +31,19 @@ import org.jetbrains.annotations.Nullable;
 @Command({"realty", "rl"})
 public final class SearchCommands implements CommandHandler {
 
-    private final SearchDialog searchDialog;
+    private final SearchResults searchResults;
+    private final SearchDialogHandler dialogHandler;
+    private final DialogManager dialogs;
     private final Message messages;
 
     @Inject
-    public SearchCommands(@NotNull SearchDialog searchDialog,
+    public SearchCommands(@NotNull SearchResults searchResults,
+                          @NotNull SearchDialogHandler dialogHandler,
+                          @NotNull DialogManager dialogs,
                           @NotNull Message messages) {
-        this.searchDialog = searchDialog;
+        this.searchResults = searchResults;
+        this.dialogHandler = dialogHandler;
+        this.dialogs = dialogs;
         this.messages = messages;
     }
 
@@ -48,7 +56,7 @@ public final class SearchCommands implements CommandHandler {
             sender.sendMessage(this.messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
-        this.searchDialog.open(player);
+        this.dialogs.open(player, SearchDialogHandler.class, this.dialogHandler.newModel(player));
     
     }
 
@@ -75,7 +83,7 @@ public final class SearchCommands implements CommandHandler {
         Collection<String> excludedTagIds = parseTagIds(excludeTags);
         // An absent --max-price means no upper bound.
         double maxPrice = maxPriceFlag != null ? maxPriceFlag : Double.MAX_VALUE;
-        this.searchDialog.performSearch(sender, includeFreehold, includeLeasehold, tagIds,
+        this.searchResults.performSearch(sender, includeFreehold, includeLeasehold, tagIds,
                 excludedTagIds, minPrice, maxPrice, occupancy, page);
     
     }

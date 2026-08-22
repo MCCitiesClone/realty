@@ -1,5 +1,8 @@
-package io.github.md5sha256.realty.command;
+package io.github.md5sha256.realty.dialog;
 
+import io.paradaux.hibernia.framework.usher.DialogManager;
+import io.github.md5sha256.realty.command.util.SubregionLandlordUpdater;
+import io.github.md5sha256.realty.command.DurationUnit;
 import com.google.inject.Inject;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.regions.Region;
@@ -60,7 +63,7 @@ import io.github.md5sha256.realty.wand.WandSelection;
  * duration; page 2 is a plain-English confirmation. Submit calls
  * {@link RealtyPaperApi#quickCreateSubregion}. Modelled on {@code SearchDialog}.</p>
  */
-public final class SubregionDialog {
+public final class SubregionFlow {
 
     static final String BYPASS_PERMISSION = "realty.command.subregion.confirm.bypass";
     private static final Pattern VALID_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9-]+$");
@@ -88,16 +91,17 @@ public final class SubregionDialog {
     private final AtomicReference<Settings> settings;
     private final AtomicReference<RealtyTags> realtyTags;
     private final Message messages;
-    private final ConcurrentHashMap<UUID, SubregionState> playerStates = new ConcurrentHashMap<>();
+    private final DialogManager dialogs;
 
     @Inject
-    public SubregionDialog(@NotNull RealtyPaperApi api,
+    public SubregionFlow(@NotNull RealtyPaperApi api,
                            @NotNull ExecutorState executorState,
                            @NotNull Database database,
                            @NotNull SubregionWandManager wandManager,
                            @NotNull AtomicReference<Settings> settings,
                            @NotNull AtomicReference<RealtyTags> realtyTags,
-                           @NotNull Message messages) {
+                           @NotNull Message messages,
+                           @NotNull DialogManager dialogs) {
         this.api = api;
         this.executorState = executorState;
         this.database = database;
@@ -105,6 +109,7 @@ public final class SubregionDialog {
         this.settings = settings;
         this.realtyTags = realtyTags;
         this.messages = messages;
+        this.dialogs = dialogs;
     }
 
     /**
@@ -119,7 +124,7 @@ public final class SubregionDialog {
         }
         if (!wandSelection.heightSet()) {
             // No vertical span chosen yet — collect it first, then this dialog reopens.
-            showHeightDialog(player, wandSelection);
+            openHeight(player);
             return;
         }
         Region selection = wandSelection.toRegion();
@@ -209,8 +214,7 @@ public final class SubregionDialog {
                             state.permittedTagIds.add(tag.tagId());
                         }
                     }
-                    playerStates.put(player.getUniqueId(), state);
-                    showCreateDialog(player, state);
+                    this.dialogs.open(player, SubregionDialogHandler.class, "details", state);
                 }, executorState.mainThreadExec())
                 .exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
@@ -224,285 +228,32 @@ public final class SubregionDialog {
      * Opens the height dialog for the player's current footprint selection.
      */
     public void openHeight(@NotNull Player player) {
-        WandSelection selection = wandManager.get(player.getUniqueId());
+        WandSelection selection = this.wandManager.get(player.getUniqueId());
         if (selection == null || !selection.isComplete()) {
-            player.sendMessage(messages.component(MessageKeys.SUBREGION_SELECTION_INCOMPLETE));
+            player.sendMessage(this.messages.component(MessageKeys.SUBREGION_SELECTION_INCOMPLETE));
             return;
         }
-        showHeightDialog(player, selection);
+        SubregionState state = new SubregionState();
+        state.world = selection.world();
+        state.worldId = state.world.getUID();
+        this.dialogs.open(player, SubregionDialogHandler.class, "height", state);
     }
 
-    private void showHeightDialog(@NotNull Player player,
-                                  @NotNull WandSelection selection) {
-        World world = selection.world();
-        // Floor is the lowest corner the player marked; the slider only sets how tall it is.
-        int baseFloor = selection.minPointY();
-        int worldMax = world.getMaxHeight() - 1;
-        int maxHeight = Math.max(1, worldMax - baseFloor + 1);
-
-        int currentHeight = selection.heightSet()
-                ? selection.ceilingY() - selection.floorY() + 1
-                : DEFAULT_HEIGHT;
-        currentHeight = Math.max(1, Math.min(maxHeight, currentHeight));
-
-        List<DialogInput> inputs = new ArrayList<>();
-        inputs.add(DialogInput.numberRange(INPUT_HEIGHT, Component.text("Height"),
-                        1f, (float) maxHeight)
-                .width(250)
-                .step(1f)
-                .initial((float) currentHeight)
-                .labelFormat("%s: %s blocks")
-                .build());
-
-        ClickCallback.Options clickOptions = CLICK_OPTIONS;
-
-        DialogActionCallback previewCallback = (response, audience) -> {
-            saveHeight(selection, response, baseFloor, worldMax);
-            // On success the dialog closes and the wand's particle outline previews the full shape.
-        };
-        DialogActionCallback continueCallback = (response, audience) -> {
-            saveHeight(selection, response, baseFloor, worldMax);
-            open(player);
-        };
-        DialogActionCallback clearCallback = (response, audience) -> {
-            wandManager.clear(player.getUniqueId());
-            player.sendMessage(messages.component(MessageKeys.SUBREGION_SELECTION_CLEARED));
-        };
-
-        List<ActionButton> actions = new ArrayList<>();
-        actions.add(ActionButton.builder(Component.text("Preview"))
-                .width(150)
-                .action(DialogAction.customClick(previewCallback, clickOptions))
-                .build());
-        actions.add(ActionButton.builder(Component.text("Continue", NamedTextColor.GREEN))
-                .width(150)
-                .action(DialogAction.customClick(continueCallback, clickOptions))
-                .build());
-        actions.add(ActionButton.builder(Component.text("Clear", NamedTextColor.RED))
-                .width(150)
-                .action(DialogAction.customClick(clearCallback, clickOptions))
-                .build());
-
-        Dialog dialog = Dialog.create(factory -> factory.empty()
-                .base(DialogBase.builder(Component.text("Step 1 of 3: Height"))
-                        .canCloseWithEscape(true)
-                        .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                        .body(List.of(DialogBody.plainMessage(Component.text(
-                                "Starts at the corners you placed. Drag to set the height."))))
-                        .inputs(inputs)
-                        .build())
-                .type(DialogType.multiAction(actions,
-                        ActionButton.builder(Component.text("Cancel")).width(150).build(),
-                        1)));
-        player.showDialog(dialog);
-    }
-
-    private void saveHeight(@NotNull WandSelection selection,
-                            @NotNull DialogResponseView response,
-                            int baseFloor, int worldMax) {
-        Float raw = response.getFloat(INPUT_HEIGHT);
-        int height = raw == null ? DEFAULT_HEIGHT : Math.max(1, Math.round(raw));
-        int ceiling = Math.min(worldMax, baseFloor + height - 1);
-        selection.setHeight(baseFloor, ceiling);
-    }
-
-    private void showCreateDialog(@NotNull Player player, @NotNull SubregionState state) {
-        List<DialogInput> inputs = new ArrayList<>();
-
-        List<SingleOptionDialogInput.OptionEntry> parentEntries = new ArrayList<>();
-        for (String id : state.parentCandidates) {
-            parentEntries.add(SingleOptionDialogInput.OptionEntry.create(
-                    id, Component.text(id), id.equals(state.parentId)));
-        }
-        inputs.add(DialogInput.singleOption(INPUT_PARENT, Component.text("Region"),
-                        parentEntries)
-                .width(FORM_INPUT_WIDTH).labelVisible(true).build());
-
-        inputs.add(DialogInput.text(INPUT_NAME, Component.text("Name"))
-                .width(FORM_INPUT_WIDTH).initial(state.name).maxLength(40).build());
-
-        inputs.add(DialogInput.text(INPUT_PRICE, Component.text("Price"))
-                .width(FORM_INPUT_WIDTH).initial(state.price).maxLength(15).build());
-
-        inputs.add(DialogInput.text(INPUT_DURATION_AMOUNT, Component.text("Lease length"))
-                .width(FORM_INPUT_WIDTH).initial(state.durationAmount).maxLength(9).build());
-
-        List<SingleOptionDialogInput.OptionEntry> unitEntries = new ArrayList<>();
-        for (DurationUnit unit : DurationUnit.values()) {
-            unitEntries.add(SingleOptionDialogInput.OptionEntry.create(
-                    unit.name(), Component.text(unit.label),
-                    unit.name().equals(state.durationUnit)));
-        }
-        inputs.add(DialogInput.singleOption(INPUT_DURATION_UNIT, Component.text("Unit"),
-                        unitEntries)
-                .width(FORM_INPUT_WIDTH).labelVisible(true).build());
-
-        inputs.add(DialogInput.bool(INPUT_UNLIMITED_RENEWALS, Component.text("Unlimited renewals"))
-                .initial(state.unlimitedRenewals).onTrue("true").onFalse("false").build());
-        inputs.add(DialogInput.text(INPUT_MAX_RENEWALS, Component.text("Max renewals (if limited)"))
-                .width(FORM_INPUT_WIDTH).initial(state.maxRenewals).maxLength(6).build());
-
-        ClickCallback.Options clickOptions = CLICK_OPTIONS;
-
-        DialogActionCallback nextCallback = (response, audience) -> {
-            saveCreate(state, response);
-            RegionManager regionManager = regionManager(state.world);
-            state.error = regionManager == null
-                    ? error("Region manager unavailable")
-                    : validate(state, regionManager);
-            if (state.error != null) {
-                showCreateDialog(player, state);
-                return;
-            }
-            showConfirmDialog(player, state);
-        };
-        DialogActionCallback tagsCallback = (response, audience) -> {
-            saveCreate(state, response);
-            showTagDialog(player, state);
-        };
-
-        List<ActionButton> actions = new ArrayList<>();
-        actions.add(ActionButton.builder(Component.text("Next", NamedTextColor.GREEN))
-                .width(150)
-                .action(DialogAction.customClick(nextCallback, clickOptions))
-                .build());
-        if (!state.permittedTagIds.isEmpty()) {
-            actions.add(ActionButton.builder(Component.text("Tags"))
-                    .width(150)
-                    .action(DialogAction.customClick(tagsCallback, clickOptions))
-                    .build());
-        }
-
-        List<DialogBody> body = new ArrayList<>();
-        if (state.error != null) {
-            body.add(DialogBody.plainMessage(state.error.colorIfAbsent(NamedTextColor.RED)));
-        }
-        body.add(DialogBody.plainMessage(Component.text("Landlord: " + player.getName())));
-        // The error is a one-shot for this reopen; don't keep it around for Back/Done navigation.
-        state.error = null;
-
-        Dialog dialog = Dialog.create(factory -> factory.empty()
-                .base(DialogBase.builder(Component.text("Step 2 of 3: Details"))
-                        .canCloseWithEscape(true)
-                        .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                        .body(body)
-                        .inputs(inputs)
-                        .build())
-                .type(DialogType.multiAction(actions,
-                        ActionButton.builder(Component.text("Cancel")).width(150).build(),
-                        1)));
-        player.showDialog(dialog);
-    }
-
-    private void showTagDialog(@NotNull Player player, @NotNull SubregionState state) {
-        RealtyTags tags = realtyTags.get();
-        List<DialogInput> inputs = new ArrayList<>();
-        for (int i = 0; i < state.permittedTagIds.size(); i++) {
-            String tagId = state.permittedTagIds.get(i);
-            ConfigRegionTag tag = tags.get(tagId);
-            if (tag == null) {
-                continue;
-            }
-            inputs.add(DialogInput.bool(TAG_INPUT_PREFIX + i, tag.tagDisplayName())
-                    .initial(state.selectedTags.contains(tagId))
-                    .onTrue("true").onFalse("false").build());
-        }
-
-        ClickCallback.Options clickOptions = CLICK_OPTIONS;
-
-        DialogActionCallback doneCallback = (response, audience) -> {
-            saveTags(state, response);
-            showCreateDialog(player, state);
-        };
-
-        List<ActionButton> actions = new ArrayList<>();
-        actions.add(ActionButton.builder(Component.text("Done", NamedTextColor.GREEN))
-                .width(150)
-                .action(DialogAction.customClick(doneCallback, clickOptions))
-                .build());
-
-        Dialog dialog = Dialog.create(factory -> factory.empty()
-                .base(DialogBase.builder(Component.text("Step 2 of 3: Tags"))
-                        .canCloseWithEscape(true)
-                        .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                        .body(List.of(DialogBody.plainMessage(Component.text(
-                                "Pick the tags for this subregion."))))
-                        .inputs(inputs)
-                        .build())
-                .type(DialogType.multiAction(actions,
-                        ActionButton.builder(Component.text("Cancel")).width(150).build(),
-                        1)));
-        player.showDialog(dialog);
-    }
-
-    private void showConfirmDialog(@NotNull Player player, @NotNull SubregionState state) {
-        double price = parsePrice(state.price);
-
-        String renewals = state.unlimitedRenewals ? "Unlimited" : state.maxRenewals;
-
-        List<DialogBody> body = new ArrayList<>();
-        body.add(DialogBody.plainMessage(Component.text()
-                .append(Component.text("Renting out "))
-                .append(Component.text(state.name, NamedTextColor.AQUA))
-                .build()));
-        body.add(DialogBody.plainMessage(Component.text("Landlord: " + player.getName())));
-        body.add(DialogBody.plainMessage(Component.text()
-                .append(Component.text("Price: "))
-                .append(Component.text(CurrencyFormatter.format(price), NamedTextColor.GREEN))
-                .build()));
-        body.add(DialogBody.plainMessage(Component.text()
-                .append(Component.text("Lease: "))
-                .append(Component.text(durationSummary(state), NamedTextColor.GREEN))
-                .build()));
-        body.add(DialogBody.plainMessage(Component.text("Renewals: " + renewals)));
-        if (!state.selectedTags.isEmpty()) {
-            body.add(DialogBody.plainMessage(Component.text(
-                    "Tags: " + String.join(", ", state.selectedTags))));
-        }
-
-        ClickCallback.Options clickOptions = CLICK_OPTIONS;
-
-        DialogActionCallback confirmCallback = (response, audience) -> submit(player, state);
-        DialogActionCallback backCallback = (response, audience) -> showCreateDialog(player, state);
-
-        List<ActionButton> actions = new ArrayList<>();
-        actions.add(ActionButton.builder(Component.text("Confirm", NamedTextColor.GREEN))
-                .width(150)
-                .action(DialogAction.customClick(confirmCallback, clickOptions))
-                .build());
-        actions.add(ActionButton.builder(Component.text("Back"))
-                .width(150)
-                .action(DialogAction.customClick(backCallback, clickOptions))
-                .build());
-
-        Dialog dialog = Dialog.create(factory -> factory.empty()
-                .base(DialogBase.builder(Component.text("Step 3 of 3: Confirm"))
-                        .canCloseWithEscape(true)
-                        .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                        .body(body)
-                        .inputs(List.of())
-                        .build())
-                .type(DialogType.multiAction(actions,
-                        ActionButton.builder(Component.text("Cancel")).width(150).build(),
-                        actions.size())));
-        player.showDialog(dialog);
-    }
-
-    private void submit(@NotNull Player player, @NotNull SubregionState state) {
+    void submit(@NotNull Player player, @NotNull SubregionState state) {
         RegionManager regionManager = regionManager(state.world);
         state.error = regionManager == null
                 ? error("Region manager unavailable")
                 : validate(state, regionManager);
         if (state.error != null) {
-            // Reopen the details dialog so the error is visible rather than hidden behind it.
-            showCreateDialog(player, state);
+            // Reopen at the details screen so the error is visible rather than hidden behind it.
+            this.dialogs.open(player, SubregionDialogHandler.class, "details", state);
             return;
         }
         ProtectedRegion parent = regionManager.getRegion(state.parentId);
         if (parent == null) {
             state.error = messages.component(MessageKeys.SUBREGION_NO_FREEHOLD,
                     "region", state.parentId);
-            showCreateDialog(player, state);
+            this.dialogs.open(player, SubregionDialogHandler.class, "details", state);
             return;
         }
         WorldGuardRegion parentRegion = new WorldGuardRegion(parent, state.world);
@@ -517,7 +268,6 @@ public final class SubregionDialog {
                     switch (result) {
                         case RealtyPaperApi.QuickCreateSubregionResult.Success s -> {
                             wandManager.clear(player.getUniqueId());
-                            playerStates.remove(player.getUniqueId());
                             applyTags(s.regionId(), new LinkedHashSet<>(state.selectedTags));
                             player.sendMessage(messages.component(MessageKeys.SUBREGION_CREATE_SUCCESS,
                                     "region", s.regionId(),
@@ -562,7 +312,7 @@ public final class SubregionDialog {
      * enforced at {@link #open}; this re-checks the user-entered fields plus name uniqueness and
      * sibling overlap against the chosen parent.
      */
-    private @Nullable Component validate(@NotNull SubregionState state,
+    @Nullable Component validate(@NotNull SubregionState state,
                                          @NotNull RegionManager regionManager) {
         if (state.name == null || !VALID_NAME_PATTERN.matcher(state.name).matches()) {
             return messages.component(MessageKeys.SUBREGION_INVALID_NAME,
@@ -596,61 +346,15 @@ public final class SubregionDialog {
         return null;
     }
 
-    private @NotNull Component error(@NotNull String text) {
+    @NotNull Component error(@NotNull String text) {
         return messages.component(MessageKeys.COMMON_ERROR, "error", text);
-    }
-
-    private void saveCreate(@NotNull SubregionState state, @NotNull DialogResponseView response) {
-        String parent = response.getText(INPUT_PARENT);
-        if (parent != null) {
-            state.parentId = parent;
-        }
-        String name = response.getText(INPUT_NAME);
-        if (name != null) {
-            state.name = name.trim();
-        }
-        String price = response.getText(INPUT_PRICE);
-        if (price != null) {
-            state.price = price;
-        }
-        String amount = response.getText(INPUT_DURATION_AMOUNT);
-        if (amount != null) {
-            state.durationAmount = amount.trim();
-        }
-        String unit = response.getText(INPUT_DURATION_UNIT);
-        if (unit != null) {
-            state.durationUnit = unit;
-        }
-        Boolean unlimited = response.getBoolean(INPUT_UNLIMITED_RENEWALS);
-        if (unlimited != null) {
-            state.unlimitedRenewals = unlimited;
-        }
-        String renewals = response.getText(INPUT_MAX_RENEWALS);
-        if (renewals != null) {
-            state.maxRenewals = renewals.trim();
-        }
-    }
-
-    private void saveTags(@NotNull SubregionState state, @NotNull DialogResponseView response) {
-        for (int i = 0; i < state.permittedTagIds.size(); i++) {
-            Boolean on = response.getBoolean(TAG_INPUT_PREFIX + i);
-            if (on == null) {
-                continue;
-            }
-            String tagId = state.permittedTagIds.get(i);
-            if (on) {
-                state.selectedTags.add(tagId);
-            } else {
-                state.selectedTags.remove(tagId);
-            }
-        }
     }
 
     /**
      * Returns the max-renewals value to store: {@code -1} for unlimited, otherwise the entered
      * count. Returns {@code null} if the entered count isn't a valid non-negative number.
      */
-    private Integer resolveMaxRenewals(@NotNull SubregionState state) {
+    Integer resolveMaxRenewals(@NotNull SubregionState state) {
         if (state.unlimitedRenewals) {
             return UNLIMITED_RENEWALS;
         }
@@ -662,7 +366,7 @@ public final class SubregionDialog {
         }
     }
 
-    private Duration resolveDuration(@NotNull SubregionState state) {
+    Duration resolveDuration(@NotNull SubregionState state) {
         long amount;
         try {
             amount = Long.parseLong(state.durationAmount.trim());
@@ -675,7 +379,7 @@ public final class SubregionDialog {
         return Duration.ofSeconds(amount * durationUnitOf(state).seconds);
     }
 
-    private static DurationUnit durationUnitOf(@NotNull SubregionState state) {
+    static DurationUnit durationUnitOf(@NotNull SubregionState state) {
         try {
             return DurationUnit.valueOf(state.durationUnit);
         } catch (IllegalArgumentException ex) {
@@ -683,12 +387,12 @@ public final class SubregionDialog {
         }
     }
 
-    private static String durationSummary(@NotNull SubregionState state) {
+    static String durationSummary(@NotNull SubregionState state) {
         return state.durationAmount + " "
                 + durationUnitOf(state).label.toLowerCase(java.util.Locale.ROOT);
     }
 
-    private static double parsePrice(String text) {
+    static double parsePrice(String text) {
         if (text == null || text.isBlank()) {
             return -1;
         }
@@ -699,7 +403,12 @@ public final class SubregionDialog {
         }
     }
 
-    private static RegionManager regionManager(@NotNull World world) {
+    /** The region manager for a prepared state's world, or null when unavailable. */
+    @Nullable RegionManager regionManagerFor(@NotNull SubregionState state) {
+        return state.world == null ? null : regionManager(state.world);
+    }
+
+    static RegionManager regionManager(@NotNull World world) {
         return WorldGuard.getInstance().getPlatform().getRegionContainer()
                 .get(BukkitAdapter.adapt(world));
     }
