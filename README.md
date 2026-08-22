@@ -25,7 +25,6 @@ Other artifacts:
 
 ```bash
 ./gradlew :realty-paper-plan-extension:shadowJar
-./gradlew :realty-areashop-importer:shadowJar
 ```
 
 ## Modules
@@ -36,7 +35,6 @@ Other artifacts:
 | `realty-common` | Shared logic and database access |
 | `realty-paper` | Main Paper plugin |
 | `realty-paper-plan-extension` | Optional [Plan](https://github.com/plan-player-analytics/Plan) integration |
-| `realty-areashop-importer` | Optional AreaShop migration helper |
 
 ## Documentation
 
