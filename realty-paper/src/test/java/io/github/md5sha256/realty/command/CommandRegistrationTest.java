@@ -29,6 +29,7 @@ import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
 import io.papermc.paper.command.brigadier.Commands;
 import io.paradaux.hibernia.framework.commander.CommandManager;
+import io.paradaux.hibernia.framework.commander.annotations.Command;
 import io.paradaux.hibernia.framework.configurator.ConfigurationProcessor;
 import io.paradaux.hibernia.framework.commander.RouteInfo;
 import io.paradaux.hibernia.framework.commander.spi.CommandHandler;
@@ -50,6 +51,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -212,6 +215,24 @@ class CommandRegistrationTest {
     }
 
     @Test
+    @DisplayName("every @Command class on the classpath is listed in the registry")
+    void theRegistryListsEveryHandler() {
+        // Every other assertion in this class iterates RealtyCommands.HANDLERS, so a handler
+        // missing from that list is invisible to all of them -- the tests pass while the command
+        // does not exist. Ten handlers were omitted exactly this way. Compare the list against
+        // what is actually on the classpath instead of trusting it.
+        Set<String> registered = RealtyCommands.HANDLERS.stream()
+                .map(Class::getSimpleName)
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        Set<String> onClasspath = annotatedHandlersOnDisk();
+
+        Assertions.assertFalse(onClasspath.isEmpty(), "the handler package scan found nothing");
+        Assertions.assertEquals(onClasspath, registered,
+                "RealtyCommands.HANDLERS is out of step with the @Command classes that exist");
+    }
+
+    @Test
     @DisplayName("every command handler registers without being skipped")
     void everyHandlerRegisters() {
         register();
@@ -332,8 +353,12 @@ class CommandRegistrationTest {
                 field.setAccessible(true);
                 try {
                     Object value = field.get(null);
+                    // A dotted lower-case constant is usually a message key, but permission
+                    // nodes look identical; those live in paper-plugin.yml, not here.
                     if (value instanceof String key && key.contains(".")
-                            && key.matches("[a-z0-9.\\-]+") && messages.getProperty(key) == null) {
+                            && key.matches("[a-z0-9.\\-]+")
+                            && !key.startsWith("realty.command.")
+                            && messages.getProperty(key) == null) {
                         missing.add(key);
                     }
                 } catch (IllegalAccessException ignored) {
@@ -343,6 +368,36 @@ class CommandRegistrationTest {
         }
         Assertions.assertEquals(Set.of(), missing,
                 "handlers reference message keys with no entry in messages.properties");
+    }
+
+    /**
+     * Every {@code @Command} class compiled into the handler package, read off disk rather than
+     * from any list the production code keeps -- the point is to catch the list being wrong.
+     */
+    private static Set<String> annotatedHandlersOnDisk() {
+        Path classes = Path.of(RealtyCommands.class.getProtectionDomain()
+                .getCodeSource().getLocation().getPath());
+        Path handlers = classes.resolve("io/github/md5sha256/realty/command/handler");
+        Assertions.assertTrue(Files.isDirectory(handlers),
+                "expected compiled handlers at " + handlers);
+
+        Set<String> found = new TreeSet<>();
+        try (java.util.stream.Stream<Path> files = Files.walk(handlers)) {
+            for (Path file : files.filter(f -> f.toString().endsWith(".class")).toList()) {
+                String simple = file.getFileName().toString().replace(".class", "");
+                if (simple.contains("$")) {
+                    continue;
+                }
+                Class<?> type = Class.forName(
+                        "io.github.md5sha256.realty.command.handler." + simple);
+                if (type.isAnnotationPresent(Command.class)) {
+                    found.add(simple);
+                }
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            throw new AssertionError("could not scan the handler package", e);
+        }
+        return found;
     }
 
     private static Set<String> declaredPermissions() throws IOException {
