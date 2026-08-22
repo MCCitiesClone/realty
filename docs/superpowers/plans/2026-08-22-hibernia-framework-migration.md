@@ -4,7 +4,9 @@
 
 **Branch:** `feat/hibernia-framework-migration` (created off `main` @ `365986e`).
 
-**Framework version:** `io.paradaux:hibernia-framework:1.1.0` (latest release; confirmed present at `https://repo.paradaux.io/releases`). Java 21, Paper 1.21.6+ — matches Realty's existing targets exactly.
+**Framework version:** the fork's `feat/realty-requirements`, branched from upstream **`develop` (1.2.0-unreleased)** — not the 1.1.0 release. `develop` is materially ahead and several of its additions land directly on this plan (see *Basing on develop*). Java 21, Paper 1.21.x.
+
+**Fork:** [`MCCitiesClone/hibernia-framework`](https://github.com/MCCitiesClone/hibernia-framework), branch `feat/realty-requirements`. Consumed by Realty through JitPack (`com.github.MCCitiesClone:hibernia-framework`), whose repository `realty-conventions` already declares. **No PRs to ParadauxIO without explicit per-PR permission.**
 
 ---
 
@@ -18,9 +20,25 @@
 | Dialogs | Migrate **both** `SearchDialog` and `SubregionDialog` to Usher |
 | Fork | `MCCitiesClone/hibernia-framework`. **No upstream PRs to ParadauxIO without explicit per-PR permission.** |
 
-### Open assumption — needs a yes/no before Phase 2
+### Config layout — decided
 
-Realty has five operator-facing config files (`settings.yml`, `database.yml`, `profiles.yml`, `region-tags.yml`, `taxes.yml`); Hibernia's `ConfigurationLoader` reads only `config.yml`. **This plan assumes we extend the configurator with a per-file `@ConfigurationComponent(file = "profiles.yml")` attribute**, so all five files keep their current names, contents and comments, and the upgrade is a no-op for every existing server. The alternative — consolidating into one ~900-line `config.yml` plus a merger — is a larger operator-facing break for less upstream work. Flagging rather than blocking; Phases 0–1 are unaffected either way.
+Confirmed: extend the configurator with per-file components. All five operator-facing files (`settings.yml`, `database.yml`, `profiles.yml`, `region-tags.yml`, `taxes.yml`) keep their current names, contents and comments, so the upgrade is a no-op for every existing server. Implemented in T0.3.
+
+### Basing on develop — what it changes
+
+Upstream `develop` carries an unreleased 1.2.0 with several things this plan had budgeted for:
+
+| Upstream already has | Effect on this plan |
+|---|---|
+| **`HelpGenerator`** — paginated, permission-filtered help built from `routeIndex()` | T4.12 shrinks from "reimplement" to "adopt and match current output" |
+| **Defaults reconciliation on upgrade** — additively merges new jar keys into operator files, comment-preserving for YAML, line-based for `.properties` | Directly serves the messages/config upgrade story in T3.2 |
+| **`KeyedException`** — semantic exceptions take a message key plus placeholders | T3.5 becomes wiring rather than design |
+| **Supertype/interface parameter resolvers** | One `WorldGuardRegion` resolver can service subtypes |
+| **`BigDecimal` config fields** | Prices and tax amounts avoid `double` |
+
+⚠ **Atomic config reload changes T2.4.** `ConfigurationLoader.reload()` now swaps in fresh component instances rather than mutating them, so a Guice-injected config singleton captured at startup keeps showing its original values. Realty must read config through `ConfigurationLoader.getComponent(...)` at point of use. The existing `AtomicReference<Settings>` indirection therefore **does not disappear** — it is replaced by loader lookups, which is the same shape. (An earlier draft of this plan said the indirection could go; that was wrong.)
+
+⚠ **Paper API target.** `develop` bumped to `paper-api:1.21.11`; Realty compiles against `1.21.8`. To confirm before Phase 1 that the framework uses no API newer than 1.21.8, or bump Realty.
 
 ---
 
@@ -63,29 +81,30 @@ Carried forward from the repo's existing plan conventions:
 
 Three features Hibernia 1.1.0 does not have. Verified by reading the framework source, not just its docs.
 
-- [ ] **T0.1 — Fork and baseline.** Fork `ParadauxIO/hibernia-framework` → `MCCitiesClone/hibernia-framework`. Branch `feat/realty-requirements`. Set version `1.1.0-realty-SNAPSHOT`, publish to `maven.democracycraft.net/snapshots` (already in `realty-conventions` repositories). **No PR to ParadauxIO.**
+- [x] **T0.1 — Fork and baseline.** Forked to `MCCitiesClone/hibernia-framework`, branch `feat/realty-requirements` off `upstream/develop`. Baseline verified: builds on Java 21 with tests and the 95%/83% JaCoCo gate green. No PR to ParadauxIO.
 
-- [ ] **T0.2 — `@Flag` support in `commander`.**
+- [x] **T0.2 — `@Flag` support in `commander`.** *(done — `7f33db7`)*
   *Why:* Realty uses ~20 flags across six commands (`list`, `history`, `search`, `terminate`, `create`, `register`) — `--page`, `--player`, `--event`, `--time`, `--now`, `--price`, `--titleholder`, `--authority`, `--landlord`, `--tags`, `--exclude-tags`, `--min-price`, `--max-price`, `--occupancy`, `--freehold`, `--leasehold`. `CommandManager` has **zero** flag handling; routes are literals, `<req>`, `[opt]` and one terminal greedy string.
   *Shape:* `@Flag("page") Integer page` / `@Flag(value = "now", presence = true) boolean now`, flags parsed as a trailing repeatable `--name value` node set in the Brigadier tree, resolved through the existing `ParameterResolver` registry (so `--player` tab-completes exactly as it does today), validated at registration alongside the existing route conflict checks.
-  *Files:* `CommandManager.java`, `RouteInfo.java`, new `annotations/Flag.java`, `CommandManagerTest`.
+  *Built:* `@Flag(value, aliases, defaultValue, presence, sanitize)`. Flags reach Brigadier as **one trailing greedy node**, not a chain of literal/argument nodes — chaining needs each node to redirect back to a dispatch node so flags can come in any order, and a Brigadier redirect opens a fresh `CommandContext`, leaving the route's own positional arguments unreachable from the context that executes. `FlagTail` supplies the grammar Brigadier would have provided, serving execution and completion from one token stream. Accepts `--n v`, `--n=v`, quoted values, any order; attaches at every executable path so optional-segment truncations take flags too. Rejected at registration: presence flags on non-booleans, primitive value flags without a default, duplicate names across aliases, flags shadowing an argument, `@GreedyArg` plus flags. 52 tests.
 
-- [ ] **T0.3 — Nested configuration support in `configurator`.**
+- [x] **T0.3 — Nested configuration support in `configurator`.** *(done — `dfe7287`)*
   *Why:* `profiles.yml` is a map of region-state → `{priority, flags: Map<String,String>, sign: {lines: List, right-click-commands: List, left-click-commands: List}}` plus a `grouped` list of objects; `region-tags.yml` is a list of objects with nested permission blocks; `taxes.yml` has a `rules` list of objects. `ConfigurationProcessor` supports only `String`, numerics, `boolean`, `List<String>` and enums.
   *Shape:* nested `@ConfigurationComponent` types, `List<T>` of components, `Map<String,String>` and `Map<Enum,T>`, plus a `file` attribute (per the open assumption above) and a MiniMessage `Component` binding to replace `plugin-infrastructure`'s `ComponentSerializer`.
-  *Files:* `ConfigurationProcessor.java`, `ConfigurationLoader.java`, `annotations/ConfigurationComponent.java`, tests.
+  *Built:* binding is now recursive and section-relative. New `@ConfigurationObject` for nested POJOs; field types gain `Map<K,V>` (String/enum/Integer keys), `List<T>` of objects, nested objects and MiniMessage `Component`. `@ConfigurationComponent(file=, path=)` for per-file and sub-rooted components; `getFile(name)` for direct access. 20 tests, run against real parsed YAML.
+  *Two findings, both bearing on Realty:* Bukkit's `set()` stores a nested map as a raw `Map`, so every object inside a list entry bound to `null` until the wrapper switched to `createSection(path, map)`. And enum matching had to become case-insensitive — YAML reads unquoted `TRUE` as a **boolean**, rendered back as `"true"`, so `region-tags.yml`'s `default: TRUE` would otherwise fail to bind against a constant named `TRUE`.
 
-- [ ] **T0.4 — Parameterised `@Action` targets in `usher`.**
+- [x] **T0.4 — Parameterised `@Action` targets in `usher`.** *(done — `524b496`)*
   *Why:* `SearchDialog` builds one button per config-defined region tag, each closing over its own `tagId` and cycling Ignore→Include→Exclude. Usher's `ButtonSpec.action(label, "name")` targets a **statically named** `@Action` method resolved from a `Map<String,Method>` — there is no per-button payload, and the tag set is runtime config, so one method per tag is impossible.
   *Shape:* `ButtonSpec.action(label, "cycleTag", "residential")` routed to `@Action("cycleTag") void cycle(@ActionArg String tagId, @Model SearchModel m, DialogFlow flow)`.
-  *Files:* `ButtonSpec.java`, `DialogManager.java` (`dispatchAction`/`injectParam`), new `annotations/ActionArg.java`, tests.
+  *Built:* an ACTION `ButtonSpec` may carry an argument, delivered via `@ActionArg` (String, numerics, boolean, enums). A null argument fails loudly for a primitive parameter rather than passing `0`, which would read as a real click on item zero. 18 tests.
   *Not needed:* dynamic **inputs** already work — `DialogContext` is injectable and exposes the raw `DialogResponseView`, so `SubregionDialog`'s `tag_0…tag_n` boolean inputs read fine unchanged.
 
 ---
 
 ## Phase 1 — Build, bootstrap, DI
 
-- [ ] **T1.1** Add `implementation("io.paradaux:hibernia-framework:1.1.0-realty-SNAPSHOT")` to `realty-paper`. Repos already present in `realty-conventions`.
+- [ ] **T1.1** Add the JitPack dependency on the fork to `realty-paper`; the `jitpack` repository is already in `realty-conventions`. Confirm the Paper API version question above first.
 - [ ] **T1.2** shadowJar relocations for `com.google.inject`, `com.google.common`, `org.reflections`, `javax.inject`, `org.aopalliance`, `javassist`. **Verify against the adapter contract** — `chat-adapter` and `essentials-adapter` must still load; add a `runServer` smoke check to the task's done-criteria.
 - [ ] **T1.3** New `RealtyModule extends AbstractModule` binding the services `Realty.java` currently constructs by hand: `Database`, `RealtyBackend`, `RealtyPaperApi`, `ExecutorState`, `PartyService`, `EconomyProvider`, `RegionProfileService`, `SignCache`, `SignTextApplicator`, `ProfileApplicator`, `RealtyEventDispatch`, `SquirrelIdUsernameResolver`, `SafeLocationFinder`, `ModuleLifecycleManager`.
 - [ ] **T1.4** Economy resolution (`Treasury` → `Vault` → self-disable) becomes a Guice `@Provides` method; the late-bound `PartyService`↔`RealtyBackend` cycle keeps its supplier indirection.
@@ -116,7 +135,7 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 - [ ] **T4.2–T4.9** Port ~30 `CustomCommandBean`s to `@Command({"realty","rl"})` handler classes, one per current group. **Verified safe:** `CommandManager` merges multiple handler classes under one root label with startup conflict detection, so the flat `/realty` tree survives intact.
 - [ ] **T4.10** Flags via `@Flag` (T0.2).
 - [ ] **T4.11** `@Permission` per route, node strings unchanged; `paper-plugin.yml` untouched.
-- [ ] **T4.12** `HelpCommand` → `CommandManager.routeIndex()` + `@Description`, reproducing today's categories and pagination.
+- [ ] **T4.12** `HelpCommand` → upstream `HelpGenerator` + `@Description`, reproducing today's categories and pagination.
 - [ ] **T4.13** Replace `BrigadierArgumentSyntaxTest` with a route-registration validation test. Delete Cloud dep + relocations.
 
 ## Phase 5 — Listeners
@@ -158,8 +177,9 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 | **Guice relocation breaking adapter module loading** | T1.2 gated on a live `runServer` load of both adapters |
 | **Silent permission-default change** (an undeclared node defaults to OP) | `PermissionManifestTest` stays green throughout; node strings never edited |
 | **Usher dynamic tag grid** | T0.4 designed and tested on the fork before Phase 6 starts |
-| **Fork divergence from upstream** | Feature branch kept rebasable; repin to an official release if/when Paradaux ships equivalents |
+| **Fork divergence from upstream** | Branched from `develop` rather than the release, so the delta stays small and rebasable; repin to an official release if/when Paradaux ships equivalents |
+| **Paper API 1.21.11 vs Realty's 1.21.8** | Audited before Phase 1; bump Realty or hold the framework at 1.21.8 |
 
 ## Sequencing
 
-Phase 0 gates Phases 2, 4 and 6. Phases 1, 3 and 5 can proceed against stock 1.1.0. Single branch, one commit per task.
+Phase 0 is **complete**. It gated Phases 2, 4 and 6, which are now unblocked. Single branch, one commit per task.
