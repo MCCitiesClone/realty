@@ -1,5 +1,7 @@
 package io.github.md5sha256.realty;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import com.minecraftcitiesnetwork.pluginInfrastructure.configurate.ComponentSerializer;
 import com.minecraftcitiesnetwork.pluginInfrastructure.configurate.SimpleDateFormatSerializer;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
@@ -87,6 +89,7 @@ import io.github.md5sha256.realty.settings.RegionTagSettings;
 import io.github.md5sha256.realty.settings.Settings;
 import io.github.md5sha256.realty.settings.TaxSettings;
 import io.github.md5sha256.realty.util.SquirrelIdUsernameResolver;
+import io.paradaux.hibernia.framework.guice.HiberniaModule;
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -160,6 +163,9 @@ public final class Realty extends JavaPlugin {
     private RealtyPaperApi paperApi;
     private RealtyEventDispatch eventDispatch;
     private ModuleLifecycleManager<Realty> moduleManager;
+    private SubregionWand subregionWand;
+    private SubregionWandManager subregionWandManager;
+    private Injector injector;
     private boolean failedLoad = false;
 
     private static @NotNull PermissionDefault toBukkitPermission(@NotNull ConfigRegionTag tag) {
@@ -192,6 +198,18 @@ public final class Realty extends JavaPlugin {
 
     public RealtyPaperApi paperApi() {
         return this.paperApi;
+    }
+
+    /**
+     * Realty's Guice injector. Available from the end of {@link #onEnable()}.
+     *
+     * <p>Deliberately not exposed to module jars: the adapters exchange only Realty's own
+     * types and pre-rendered components with core, and the DI stack is relocated in the shaded
+     * jar, so an adapter compiled against these types would not resolve them at runtime.</p>
+     */
+    @NotNull
+    Injector injector() {
+        return Objects.requireNonNull(this.injector, "Injector not initialized!");
     }
 
     public RegionProfileSettings regionFlagSettings() {
@@ -318,6 +336,11 @@ public final class Realty extends JavaPlugin {
                 new ModuleLoader(getDataFolder().toPath().resolve("modules")),
                 Realty.class.getName(),
                 getLogger());
+        // Built here rather than inside registerCommands so the injector can bind them: the
+        // subregion flow reaches the wand from both a command and a listener.
+        this.subregionWand = new SubregionWand(this, this.settings);
+        this.subregionWandManager = new SubregionWandManager();
+        this.injector = createInjector(economyProvider, safeLocationFinder);
         scheduleTasks();
         registerCommands(this.paperApi,
                 this.executorState,
@@ -368,6 +391,44 @@ public final class Realty extends JavaPlugin {
             }
         }
         getLogger().info("Plugin disabled successfully");
+    }
+
+    /**
+     * Builds the Guice injector over the service graph {@link #onEnable()} has just finished
+     * constructing.
+     *
+     * <p>{@code withoutMessages()} for now: Realty still renders through its own
+     * {@link MessageContainer} over {@code messages.yml}, and Hibernia's {@code Message} bean
+     * eagerly loads a {@code messages.properties} that does not exist yet. Configuration
+     * scanning is likewise deferred — the settings classes are still Configurate-bound.</p>
+     */
+    private @NotNull Injector createInjector(@NotNull EconomyProvider economyProvider,
+                                             @NotNull SafeLocationFinder safeLocationFinder) {
+        HiberniaModule hibernia = HiberniaModule.forPlugin(this)
+                .withoutMessages()
+                .build();
+        return Guice.createInjector(hibernia, new RealtyModule(
+                this,
+                this.messageContainer,
+                this.settings,
+                this.regionFlagSettings,
+                this.realtyTags,
+                this.taxSettings,
+                this.executorState,
+                this.database,
+                this.logic,
+                this.paperApi,
+                economyProvider,
+                this.partyService,
+                this.regionProfileService,
+                this.signCache,
+                this.signTextApplicator,
+                this.profileApplicator,
+                this.eventDispatch,
+                this.nameResolver,
+                safeLocationFinder,
+                this.subregionWand,
+                this.subregionWandManager));
     }
 
     private void registerTreasuryTaxProvider() {
@@ -784,14 +845,12 @@ public final class Realty extends JavaPlugin {
         String version = getPluginMeta().getVersion();
         var helpCommand = new HelpCommand(messageContainer);
 
-        SubregionWand subregionWand = new SubregionWand(this, this.settings);
-        SubregionWandManager subregionWandManager = new SubregionWandManager();
         SubregionDialog subregionDialog = new SubregionDialog(paperApi, executorState,
-                this.database, subregionWandManager, this.settings, this.realtyTags,
+                this.database, this.subregionWandManager, this.settings, this.realtyTags,
                 messageContainer);
         PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(
-                new SubregionWandListener(this, subregionWand, subregionWandManager,
+                new SubregionWandListener(this, this.subregionWand, this.subregionWandManager,
                         messageContainer), this);
         pluginManager.registerEvents(
                 new RegionNotificationListener(this.eventDispatch, messageContainer,
@@ -847,8 +906,8 @@ public final class Realty extends JavaPlugin {
                 new RemoveCommand(messageContainer),
                 new SignCommand(paperApi, executorState, messageContainer, this.partyService),
                 new TeleportCommand(getLogger(), paperApi, this.settings, messageContainer, safeLocationFinder),
-                new SubregionCommandGroup(subregionWand, subregionWandManager, subregionDialog,
-                        messageContainer),
+                new SubregionCommandGroup(this.subregionWand, this.subregionWandManager,
+                        subregionDialog, messageContainer),
                 new CleanupCommandGroup(this.database,
                         executorState,
                         this.realtyTags,

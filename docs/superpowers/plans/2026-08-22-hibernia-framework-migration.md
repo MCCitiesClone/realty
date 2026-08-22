@@ -153,7 +153,7 @@ Three features Hibernia 1.1.0 does not have. Verified by reading the framework s
 ## Phase 7 — Adapters, extension, importer
 
 - [ ] **T7.1** Confirm both adapters load and deliver under relocation (chat + Essentials mail smoke test via `runServer`).
-- [ ] **T7.2** `realty-paper-plan-extension` and `realty-areashop-importer`: verify only; neither touches the migrated tiers.
+- [x] **T7.2** `realty-areashop-importer` removed from this branch — the branch targets fresh servers and those already migrated off AreaShop, and the module's only dependency (the archived `md5sha256/AreaShop` fork) had stopped resolving, so CI already skipped it. `realty-paper-plan-extension`: verify only; it touches none of the migrated tiers.
 
 ## Phase 8 — Verification
 
