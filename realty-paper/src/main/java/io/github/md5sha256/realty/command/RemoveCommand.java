@@ -2,6 +2,7 @@ package io.github.md5sha256.realty.command;
 
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
+import io.github.md5sha256.realty.command.util.GroupPrefix;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.localisation.MessageContainer;
 import io.github.md5sha256.realty.localisation.MessageKeys;
@@ -68,8 +69,9 @@ public record RemoveCommand(@NotNull MessageContainer messages) implements Custo
             return;
         }
         ProtectedRegion protectedRegion = region.region();
-        if (playerOrGroup.startsWith("g:")) {
-            protectedRegion.getMembers().removeGroup(playerOrGroup.substring(2));
+        String group = GroupPrefix.groupNameIfPrefixed(playerOrGroup);
+        if (group != null) {
+            protectedRegion.getMembers().removeGroup(group);
         } else {
             OfflinePlayer target = Bukkit.getOfflinePlayer(playerOrGroup);
             protectedRegion.getMembers().removePlayer(target.getUniqueId());

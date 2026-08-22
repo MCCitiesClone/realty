@@ -806,8 +806,9 @@ transfer:
     no-permission: You do not have permission to transfer this region.
 
 government:
-    registered: <prefix> <green><account></green> can now hold regions. Use it as
-        <yellow>gov:<account></yellow> when setting an authority, landlord, titleholder or tenant.
+    registered: <prefix> <green><account></green> can now hold regions. Name it when setting an
+        authority, landlord, titleholder or tenant, or <yellow>gov.<account></yellow> if a player
+        shares the name.
     unregistered: <prefix> <red><account></red> can no longer be assigned to new regions.
     not-found: <prefix> Treasury has no government account named <yellow><account></yellow>
     not-registered: <prefix> <yellow><account></yellow> is not a registered government
