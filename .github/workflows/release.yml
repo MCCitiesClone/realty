@@ -58,12 +58,14 @@ jobs:
       - name: Collect JARs
         run: |
           mkdir -p jars
-          find . -path "*/build/libs/*.jar" -type f \
-            ! -name "*-sources.jar" \
-            ! -name "*-javadoc.jar" \
-            ! -name "*-tests.jar" \
-            ! -name "*-plain.jar" \
-            -exec cp {} jars/ \;
+          # Only the two artifacts an operator installs. Everything else that lands in build/libs
+          # is either already inside the plugin jar (chat-adapter, extracted to modules/ on first
+          # enable), a library consumed as a Gradle dependency and already shaded in
+          # (realty-backend, realty-backend-api, realty-paper-api), or build logic (buildSrc.jar).
+          # realty-paper-plan-extension is built on demand per the README, not released.
+          # A glob that matches nothing fails the step rather than publishing a short release.
+          cp realty-paper/build/libs/realty-paper-*-all.jar jars/
+          cp realty-paper-adapters/essentials-adapter/build/libs/essentials-adapter-*-all.jar jars/
           ls -l jars
 
       - name: Commit and tag version bump
