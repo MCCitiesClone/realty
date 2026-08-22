@@ -5,6 +5,7 @@ import io.github.md5sha256.realty.api.CurrencyFormatter;
 import io.github.md5sha256.realty.api.DurationFormatter;
 import io.github.md5sha256.realty.api.RealtyPaperApi;
 import io.github.md5sha256.realty.api.WorldGuardRegion;
+import io.github.md5sha256.realty.command.util.GroupPrefix;
 import io.github.md5sha256.realty.command.util.WorldGuardRegionResolver;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.SqlSessionWrapper;
@@ -62,7 +63,8 @@ public record InfoCommand(@NotNull RealtyPaperApi api,
                 .map(PartyNames::playerName)
                 .collect(Collectors.joining(", "));
         String groups = memberGroups.stream()
-                .map(g -> "g:" + g)
+                // The typeable form: /realty add g:name is rejected by the client (see GroupPrefix).
+                .map(g -> GroupPrefix.GROUP_PREFIX + g)
                 .collect(Collectors.joining(", "));
         if (!members.isEmpty() && !groups.isEmpty()) {
             return members + ", " + groups;
