@@ -79,7 +79,7 @@ class InjectorConfigurationTest {
 
     /** The files {@code onLoad} copies out of the jar before the configurator reads them. */
     private static final String[] BUNDLED_CONFIG =
-            {"settings.yml", "profiles.yml", "taxes.yml", "tags.yml", "database.yml"};
+            {"settings.yml", "profiles.yml", "taxes.yml", "region-tags.yml", "database.yml"};
 
     @TempDir
     Path dataFolder;

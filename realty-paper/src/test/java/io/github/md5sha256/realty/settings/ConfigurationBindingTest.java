@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.StringReader;
+import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -172,7 +174,14 @@ class ConfigurationBindingTest {
 
         Assertions.assertEquals("LocalGov", taxes.governmentAccount());
         Assertions.assertEquals(3, taxes.exemptPlotThreshold());
+        // Asserted through contains(), not size(): the list bound as Strings for a while, which
+        // erasure hides from a size check but makes PropertyTaxListener's Set<UUID> lookup miss
+        // every time -- exemptions silently stopped applying, with nothing logged.
         Assertions.assertEquals(1, taxes.exemptUuids().size());
+        UUID exempt = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        Assertions.assertInstanceOf(UUID.class, taxes.exemptUuids().getFirst());
+        Assertions.assertTrue(new HashSet<>(taxes.exemptUuids()).contains(exempt),
+                "an exempt owner must be found in the set PropertyTaxListener builds");
         Assertions.assertEquals(2, taxes.rules().size());
 
         TaxRule residential = taxes.rules().getFirst();
