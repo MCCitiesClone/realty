@@ -3,6 +3,7 @@ package io.github.md5sha256.realty.command.handler;
 import com.google.inject.Inject;
 import io.github.md5sha256.realty.dialog.SearchDialogHandler;
 import io.github.md5sha256.realty.dialog.SearchResults;
+import com.google.inject.Provider;
 import io.paradaux.hibernia.framework.usher.DialogManager;
 import io.github.md5sha256.realty.database.entity.OccupancyFilter;
 import io.github.md5sha256.realty.localisation.MessageKeys;
@@ -33,13 +34,16 @@ public final class SearchCommands implements CommandHandler {
 
     private final SearchResults searchResults;
     private final SearchDialogHandler dialogHandler;
-    private final DialogManager dialogs;
+    // A Provider for the same reason as SubregionFlow: DialogManager injects the set of dialog
+    // handlers, so holding it directly puts this class one edge away from an unproxyable cycle the
+    // moment any handler needs something that reaches back here.
+    private final Provider<DialogManager> dialogs;
     private final Message messages;
 
     @Inject
     public SearchCommands(@NotNull SearchResults searchResults,
                           @NotNull SearchDialogHandler dialogHandler,
-                          @NotNull DialogManager dialogs,
+                          @NotNull Provider<DialogManager> dialogs,
                           @NotNull Message messages) {
         this.searchResults = searchResults;
         this.dialogHandler = dialogHandler;
@@ -56,7 +60,7 @@ public final class SearchCommands implements CommandHandler {
             sender.sendMessage(this.messages.component(MessageKeys.COMMON_PLAYERS_ONLY));
             return;
         }
-        this.dialogs.open(player, SearchDialogHandler.class, this.dialogHandler.newModel(player));
+        this.dialogs.get().open(player, SearchDialogHandler.class, this.dialogHandler.newModel(player));
     }
 
     @Route("search results")

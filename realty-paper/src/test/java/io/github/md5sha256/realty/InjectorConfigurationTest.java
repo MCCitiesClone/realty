@@ -2,6 +2,8 @@ package io.github.md5sha256.realty;
 
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.Binding;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.spi.Element;
 import com.google.inject.spi.Elements;
@@ -32,9 +34,15 @@ import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
 import io.paradaux.hibernia.framework.configurator.ConfigurationProcessor;
+import io.paradaux.hibernia.framework.commander.CommandManager;
+import io.paradaux.hibernia.framework.events.ListenerManager;
 import io.paradaux.hibernia.framework.guice.HiberniaModule;
+import io.paradaux.hibernia.framework.usher.DialogManager;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
+import org.bukkit.scheduler.BukkitScheduler;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,7 +79,7 @@ class InjectorConfigurationTest {
 
     /** The files {@code onLoad} copies out of the jar before the configurator reads them. */
     private static final String[] BUNDLED_CONFIG =
-            {"settings.yml", "profiles.yml", "taxes.yml", "tags.yml", "database.yml"};
+            {"settings.yml", "profiles.yml", "taxes.yml", "region-tags.yml", "database.yml"};
 
     @TempDir
     Path dataFolder;
@@ -84,6 +92,11 @@ class InjectorConfigurationTest {
         Mockito.when(this.plugin.getLogger()).thenReturn(Logger.getLogger("injector-config-test"));
         Mockito.when(this.plugin.getDataFolder()).thenReturn(this.dataFolder.toFile());
         Mockito.when(this.plugin.getConfig()).thenReturn(new YamlConfiguration());
+        Server server = Mockito.mock(Server.class);
+        Mockito.when(server.getScheduler()).thenReturn(Mockito.mock(BukkitScheduler.class));
+        Mockito.when(server.isPrimaryThread()).thenReturn(true);
+        Mockito.when(server.getPluginManager()).thenReturn(Mockito.mock(PluginManager.class));
+        Mockito.when(this.plugin.getServer()).thenReturn(server);
         Mockito.when(this.plugin.getResource(Mockito.anyString())).thenAnswer(
                 invocation -> getClass().getResourceAsStream("/" + invocation.getArgument(0)));
         // The configurator reads these out of the data folder; onLoad puts them there.
@@ -187,5 +200,29 @@ class InjectorConfigurationTest {
         }
         Assertions.assertTrue(nulls.isEmpty(),
                 "these keys are bound to null, which fails injector creation at startup: " + nulls);
+    }
+
+    /**
+     * Provisions what {@code onEnable} provisions, from the modules it provisions them with.
+     *
+     * <p>The two checks above read declarations without instantiating, so they cannot see an error
+     * that only arises when Guice walks the graph. A dependency cycle is exactly that: Realty's
+     * subregion flow injected {@code DialogManager}, which injects the set of dialog handlers,
+     * which contains the handler that needs the flow. Guice breaks such a cycle only by proxying an
+     * interface, and {@code DialogManager} is a concrete class, so provisioning failed and aborted
+     * {@code onEnable} — with every binding perfectly well-formed.</p>
+     */
+    @Test
+    @DisplayName("the managers onEnable asks for can actually be provisioned")
+    void managersProvision() {
+        Injector injector = Guice.createInjector(hiberniaModule(), realtyModule());
+
+        Assertions.assertNotNull(injector.getInstance(CommandManager.class));
+        Assertions.assertNotNull(injector.getInstance(ListenerManager.class));
+        Assertions.assertNotNull(injector.getInstance(DialogManager.class));
+
+        // onEnable registers listeners straight after provisioning; the set is built by the
+        // multibinder, so a listener that cannot be constructed only shows up here.
+        injector.getInstance(ListenerManager.class).registerAll();
     }
 }
