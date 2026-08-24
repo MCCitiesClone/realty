@@ -1,5 +1,6 @@
 package io.github.md5sha256.realty.dialog;
 
+import com.google.inject.Provider;
 import io.paradaux.hibernia.framework.usher.DialogManager;
 import io.github.md5sha256.realty.command.DurationUnit;
 import com.google.inject.Inject;
@@ -78,7 +79,11 @@ public final class SubregionFlow {
     private final AtomicReference<Settings> settings;
     private final AtomicReference<RealtyTags> realtyTags;
     private final Message messages;
-    private final DialogManager dialogs;
+    // A Provider, not the manager itself: DialogManager injects the set of DialogHandlers, which
+    // contains SubregionDialogHandler, which needs this flow -- a cycle Guice cannot break by
+    // proxying, because DialogManager is a concrete class. Nothing here touches the manager during
+    // construction, so deferring the lookup to first use resolves it.
+    private final Provider<DialogManager> dialogs;
 
     @Inject
     public SubregionFlow(@NotNull RealtyPaperApi api,
@@ -88,7 +93,7 @@ public final class SubregionFlow {
                            @NotNull AtomicReference<Settings> settings,
                            @NotNull AtomicReference<RealtyTags> realtyTags,
                            @NotNull Message messages,
-                           @NotNull DialogManager dialogs) {
+                           @NotNull Provider<DialogManager> dialogs) {
         this.api = api;
         this.executorState = executorState;
         this.database = database;
@@ -201,7 +206,7 @@ public final class SubregionFlow {
                             state.permittedTagIds.add(tag.tagId());
                         }
                     }
-                    this.dialogs.open(player, SubregionDialogHandler.class, "details", state);
+                    this.dialogs.get().open(player, SubregionDialogHandler.class, "details", state);
                 }, executorState.mainThreadExec())
                 .exceptionally(ex -> {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
@@ -223,7 +228,7 @@ public final class SubregionFlow {
         SubregionState state = new SubregionState();
         state.world = selection.world();
         state.worldId = state.world.getUID();
-        this.dialogs.open(player, SubregionDialogHandler.class, "height", state);
+        this.dialogs.get().open(player, SubregionDialogHandler.class, "height", state);
     }
 
     void submit(@NotNull Player player, @NotNull SubregionState state) {
@@ -233,14 +238,14 @@ public final class SubregionFlow {
                 : validate(state, regionManager);
         if (state.error != null) {
             // Reopen at the details screen so the error is visible rather than hidden behind it.
-            this.dialogs.open(player, SubregionDialogHandler.class, "details", state);
+            this.dialogs.get().open(player, SubregionDialogHandler.class, "details", state);
             return;
         }
         ProtectedRegion parent = regionManager.getRegion(state.parentId);
         if (parent == null) {
             state.error = messages.component(MessageKeys.SUBREGION_NO_FREEHOLD,
                     "region", state.parentId);
-            this.dialogs.open(player, SubregionDialogHandler.class, "details", state);
+            this.dialogs.get().open(player, SubregionDialogHandler.class, "details", state);
             return;
         }
         WorldGuardRegion parentRegion = new WorldGuardRegion(parent, state.world);
