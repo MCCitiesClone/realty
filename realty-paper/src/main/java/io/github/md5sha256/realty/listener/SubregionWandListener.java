@@ -1,7 +1,8 @@
 package io.github.md5sha256.realty.listener;
 
+import com.google.inject.Inject;
 import com.sk89q.worldedit.math.BlockVector3;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
 import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
@@ -38,12 +39,13 @@ public final class SubregionWandListener implements Listener {
 
     private final SubregionWand wand;
     private final SubregionWandManager wandManager;
-    private final MessageContainer messages;
+    private final Message messages;
 
+    @Inject
     public SubregionWandListener(@NotNull Plugin plugin,
                                  @NotNull SubregionWand wand,
                                  @NotNull SubregionWandManager wandManager,
-                                 @NotNull MessageContainer messages) {
+                                 @NotNull Message messages) {
         this.wand = wand;
         this.wandManager = wandManager;
         this.messages = messages;
@@ -98,7 +100,7 @@ public final class SubregionWandListener implements Listener {
             WandSelection selection = wandManager.get(player.getUniqueId());
             int size = selection == null ? 0 : selection.size();
             // Keep a hint on the action bar while the wand is held (refreshed before it fades).
-            player.sendActionBar(messages.messageFor(size >= 2
+            player.sendActionBar(messages.component(size >= 2
                     ? MessageKeys.SUBREGION_HINT_READY : MessageKeys.SUBREGION_HINT_PLACE));
             if (selection == null || !selection.isComplete()
                     || selection.world() != player.getWorld()) {

@@ -23,8 +23,18 @@ dependencies {
     }
     compileOnly("io.paradaux:treasury-api:2.2.1-SNAPSHOT")
     compileOnly("org.jetbrains:annotations:26.0.2-1")
-    implementation("org.incendo:cloud-paper:2.0.0-beta.10")
-    implementation("org.spongepowered:configurate-yaml:4.2.0")
+    implementation("com.github.MCCitiesClone:hibernia-framework:93e31cf") {
+        // Paper supplies slf4j at runtime. Bundling reflections' slf4j-api 1.7.32 would either
+        // clash with Paper's 2.x or, if relocated, bind the framework's logging to a
+        // binding-less NOP logger that silently drops its warnings.
+        exclude(group = "org.slf4j", module = "slf4j-api")
+        // Annotation-only artifacts: retained solely as compile-time metadata, so shading them
+        // adds weight to the jar and nothing else.
+        exclude(group = "com.google.code.findbugs", module = "jsr305")
+        exclude(group = "org.checkerframework", module = "checker-qual")
+        exclude(group = "com.google.errorprone", module = "error_prone_annotations")
+        exclude(group = "com.google.guava", module = "listenablefuture")
+    }
     // Shared module system, schema migrations and formatting helpers. Deliberately NOT relocated in
     // shadowJar: module jars are compiled against these types and loaded into this plugin's class
     // loader, so the names must match.
@@ -55,16 +65,27 @@ tasks {
         val base = "io.github.md5sha256.realty.libraries"
         relocate("org.mariadb", "${base}.org.mariadb")
         relocate("org.mybatis", "${base}.org.mybatis")
-        relocate("org.spongepowered", "${base}.org.spongepowered")
         relocate("org.yaml", "${base}.org.yaml")
-        relocate("io.leangen.geantyref", "${base}.io.leangen.geantyref")
         relocate("org.apache.ibatis", "${base}.org.apache.ibatis")
         relocate("org.jetbrains.annotations", "${base}.org.jetbrains.annotations")
         relocate("org.intellij.lang", "${base}.org.intellij.lang")
         relocate("net.kyori.option", "${base}.net.kyori.option")
-        relocate("org.incendo.cloud", "${base}.org.incendo.cloud")
         relocate("org.enginehub.squirrelid", "${base}.org.enginehub.squirrelid")
         relocate("org.sqlite", "${base}.org.sqlite")
+        // Hibernia and its DI stack. Relocated — unlike plugin-infrastructure above — because no
+        // module jar references these types: the adapters exchange only Realty's own classes and
+        // pre-rendered Components with core. Relocating also keeps Realty's copy of
+        // io.paradaux.* off the classpath Treasury joins into this plugin (`join-classpath: true`),
+        // where two unrelocated copies of the same framework could otherwise resolve against
+        // each other.
+        relocate("io.paradaux.hibernia", "${base}.io.paradaux.hibernia")
+        relocate("com.google.inject", "${base}.com.google.inject")
+        relocate("com.google.common", "${base}.com.google.common")
+        relocate("com.google.thirdparty", "${base}.com.google.thirdparty")
+        relocate("org.reflections", "${base}.org.reflections")
+        relocate("javassist", "${base}.javassist")
+        relocate("jakarta.inject", "${base}.jakarta.inject")
+        relocate("org.aopalliance", "${base}.org.aopalliance")
         mergeServiceFiles()
 
         dependsOn(":realty-paper-adapters:chat-adapter:shadowJar")
@@ -109,4 +130,12 @@ tasks {
             url("https://mediafilez.forgecdn.net/files/3007/470/Vault.jar")
         }
     }
+}
+
+// Transitional: lets the one-off messages.yml -> messages.properties conversion run against the
+// real classpath. Removed once messages.yml is gone.
+tasks.register("printRuntimeCp") {
+    // paper-api is compileOnly, so the runtime classpath alone cannot load YamlConfiguration.
+    val cp = sourceSets["main"].compileClasspath + sourceSets["main"].output
+    doLast { println(cp.asPath) }
 }

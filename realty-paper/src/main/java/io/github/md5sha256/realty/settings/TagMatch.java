@@ -1,9 +1,9 @@
 package io.github.md5sha256.realty.settings;
 
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
 import java.util.List;
 import java.util.Locale;
@@ -20,10 +20,10 @@ import java.util.Set;
  * Both are optional; an empty/omitted list imposes no constraint, so a TagMatch
  * with neither matches every region (a catch-all). Matching is case-insensitive.
  */
-@ConfigSerializable
+@ConfigurationObject
 public record TagMatch(
-        @Setting("all") @Nullable List<String> all,
-        @Setting("any") @Nullable List<String> any
+        @ConfigurationValue(path = "all") @Nullable List<String> all,
+        @ConfigurationValue(path = "any") @Nullable List<String> any
 ) {
 
     public TagMatch {

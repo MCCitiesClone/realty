@@ -1,7 +1,7 @@
 package io.github.md5sha256.realty;
 
-import com.minecraftcitiesnetwork.pluginInfrastructure.configurate.ComponentSerializer;
-import com.minecraftcitiesnetwork.pluginInfrastructure.configurate.SimpleDateFormatSerializer;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLifecycleManager;
 import com.minecraftcitiesnetwork.pluginInfrastructure.modules.ModuleLoader;
 import com.minecraftcitiesnetwork.pluginInfrastructure.util.DateFormatter;
@@ -25,44 +25,6 @@ import io.github.md5sha256.realty.api.event.AuctionEndedEvent;
 import io.github.md5sha256.realty.api.event.LeaseExpiredEvent;
 import io.github.md5sha256.realty.api.event.LeaseTerminatedEvent;
 import io.github.md5sha256.realty.api.event.RealtyNotificationEvent;
-import io.github.md5sha256.realty.command.AddCommand;
-import io.github.md5sha256.realty.command.AgentInviteAcceptCommand;
-import io.github.md5sha256.realty.command.AgentInviteCommand;
-import io.github.md5sha256.realty.command.AgentInviteRejectCommand;
-import io.github.md5sha256.realty.command.AgentInviteWithdrawCommand;
-import io.github.md5sha256.realty.command.AgentRemoveCommand;
-import io.github.md5sha256.realty.command.AuctionCommandGroup;
-import io.github.md5sha256.realty.command.BuyCommand;
-import io.github.md5sha256.realty.command.CleanupCommandGroup;
-import io.github.md5sha256.realty.command.CreateCommand;
-import io.github.md5sha256.realty.command.CustomCommandBean;
-import io.github.md5sha256.realty.command.DeleteCommand;
-import io.github.md5sha256.realty.command.ExtendCommand;
-import io.github.md5sha256.realty.command.GovernmentCommandGroup;
-import io.github.md5sha256.realty.command.HelpCommand;
-import io.github.md5sha256.realty.command.HistoryCommand;
-import io.github.md5sha256.realty.command.InfoCommand;
-import io.github.md5sha256.realty.command.ListCommand;
-import io.github.md5sha256.realty.command.OfferCommandGroup;
-import io.github.md5sha256.realty.command.RegisterCommand;
-import io.github.md5sha256.realty.command.ModuleCommandGroup;
-import io.github.md5sha256.realty.command.ReloadCommand;
-import io.github.md5sha256.realty.command.RemoveCommand;
-import io.github.md5sha256.realty.command.RentCommand;
-import io.github.md5sha256.realty.command.RentableCommand;
-import io.github.md5sha256.realty.command.SearchCommand;
-import io.github.md5sha256.realty.command.SearchDialog;
-import io.github.md5sha256.realty.command.ModifyCommandGroup;
-import io.github.md5sha256.realty.command.SetCommandGroup;
-import io.github.md5sha256.realty.command.TerminateCommand;
-import io.github.md5sha256.realty.command.SignCommand;
-import io.github.md5sha256.realty.command.SubregionCommandGroup;
-import io.github.md5sha256.realty.command.TagCommandGroup;
-import io.github.md5sha256.realty.command.TeleportCommand;
-import io.github.md5sha256.realty.command.TransferCommand;
-import io.github.md5sha256.realty.command.UnrentCommand;
-import io.github.md5sha256.realty.command.UnsetCommandGroup;
-import io.github.md5sha256.realty.command.VersionCommand;
 import io.github.md5sha256.realty.command.util.SafeLocationFinder;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.database.RealtyBackendImpl;
@@ -71,13 +33,11 @@ import io.github.md5sha256.realty.database.maria.MariaDatabase;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
 import io.github.md5sha256.realty.listener.PropertyTaxListener;
 import io.github.md5sha256.realty.listener.RegionNotificationListener;
-import io.github.md5sha256.realty.listener.SignInteractionListener;
-import io.github.md5sha256.realty.listener.SubregionWandListener;
-import io.github.md5sha256.realty.command.SubregionDialog;
 import io.github.md5sha256.realty.wand.SubregionWand;
 import io.github.md5sha256.realty.wand.SubregionWandManager;
-import io.github.md5sha256.realty.localisation.MessageContainer;
+import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.localisation.MessageKeys;
+import io.github.md5sha256.realty.localisation.MessagesYamlConverter;
 import io.github.md5sha256.realty.settings.ConfigRegionTag;
 import io.github.md5sha256.realty.settings.GroupedRegionProfile;
 import io.github.md5sha256.realty.settings.RealtyTags;
@@ -87,9 +47,15 @@ import io.github.md5sha256.realty.settings.RegionTagSettings;
 import io.github.md5sha256.realty.settings.Settings;
 import io.github.md5sha256.realty.settings.TaxSettings;
 import io.github.md5sha256.realty.util.SquirrelIdUsernameResolver;
+import io.github.md5sha256.realty.command.RealtyCommands;
+import io.github.md5sha256.realty.dialog.SearchDialogHandler;
+import io.github.md5sha256.realty.dialog.SubregionDialogHandler;
+import io.github.md5sha256.realty.listener.RealtyListeners;
+import io.paradaux.hibernia.framework.commander.CommandManager;
+import io.paradaux.hibernia.framework.configurator.ConfigurationLoader;
+import io.paradaux.hibernia.framework.events.ListenerManager;
+import io.paradaux.hibernia.framework.guice.HiberniaModule;
 import io.papermc.paper.util.Tick;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import io.github.md5sha256.realty.economy.EconomyProvider;
 import io.github.md5sha256.realty.economy.GovernmentAccountLookup;
 import io.github.md5sha256.realty.party.PartyDomains;
@@ -104,28 +70,16 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.incendo.cloud.Command;
-import org.incendo.cloud.execution.ExecutionCoordinator;
-import org.incendo.cloud.paper.PaperCommandManager;
-import org.incendo.cloud.paper.util.sender.PaperSimpleSenderMapper;
-import org.incendo.cloud.paper.util.sender.Source;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.ConfigurationNode;
-import org.spongepowered.configurate.yaml.NodeStyle;
-import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -141,7 +95,16 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class Realty extends JavaPlugin {
 
-    private final MessageContainer messageContainer = new MessageContainer();
+    /**
+     * The operator-facing YAML files backing the configuration components. Listed so the
+     * framework merges newly shipped default keys into them on upgrade, which is what the
+     * old hand-rolled loader did on every start.
+     */
+    private static final String[] CONFIG_FILES = {
+            "settings.yml", "database.yml", "profiles.yml", "region-tags.yml", "taxes.yml"
+    };
+
+    private Message messageContainer;
     private final AtomicReference<Settings> settings = new AtomicReference<>();
     private final AtomicReference<RegionProfileSettings> regionFlagSettings = new AtomicReference<>();
     private final AtomicReference<RealtyTags> realtyTags = new AtomicReference<>();
@@ -160,6 +123,11 @@ public final class Realty extends JavaPlugin {
     private RealtyPaperApi paperApi;
     private RealtyEventDispatch eventDispatch;
     private ModuleLifecycleManager<Realty> moduleManager;
+    private SubregionWand subregionWand;
+    private SubregionWandManager subregionWandManager;
+    private HiberniaModule hibernia;
+    private ConfigurationLoader configuration;
+    private Injector injector;
     private boolean failedLoad = false;
 
     private static @NotNull PermissionDefault toBukkitPermission(@NotNull ConfigRegionTag tag) {
@@ -194,6 +162,18 @@ public final class Realty extends JavaPlugin {
         return this.paperApi;
     }
 
+    /**
+     * Realty's Guice injector. Available from the end of {@link #onEnable()}.
+     *
+     * <p>Deliberately not exposed to module jars: the adapters exchange only Realty's own
+     * types and pre-rendered components with core, and the DI stack is relocated in the shaded
+     * jar, so an adapter compiled against these types would not resolve them at runtime.</p>
+     */
+    @NotNull
+    Injector injector() {
+        return Objects.requireNonNull(this.injector, "Injector not initialized!");
+    }
+
     public RegionProfileSettings regionFlagSettings() {
         return this.regionFlagSettings.get();
     }
@@ -210,16 +190,31 @@ public final class Realty extends JavaPlugin {
     public void onLoad() {
         try {
             initDataFolder();
-            copyResourceTemplate("messages.yml", "defaults/default-messages.yml");
+            copyResourceTemplate("messages.properties", "defaults/default-messages.properties");
             copyResourceTemplate("settings.yml", "defaults/default-settings.yml");
             copyResourceTemplate("profiles.yml", "defaults/default-profiles.yml");
             copyResourceTemplate("taxes.yml", "defaults/default-taxes.yml");
-            reloadMessages();
-            this.databaseSettings = loadDatabaseSettings();
-            this.settings.set(loadSettings());
-            this.regionFlagSettings.set(loadRegionFlagSettings());
-            this.realtyTags.set(new RealtyTags(loadRegionTagSettings()));
-            this.taxSettings.set(loadTaxSettings());
+            // Carry an operator's customised messages.yml across before the framework's message
+            // bean runs; it writes a stock messages.properties when it finds none, which would
+            // silently discard their edits.
+            MessagesYamlConverter.migrateIfNeeded(getDataFolder().toPath(), getLogger());
+            // Built during onLoad, not onEnable: the database settings decide whether the plugin
+            // may enable at all, and the profile and tag settings are needed before the first
+            // region is touched. The injector itself comes later, once the services exist.
+            this.hibernia = HiberniaModule.forPlugin(this)
+                    .scanConfiguration("io.github.md5sha256.realty.settings")
+                    .scanConfiguration("io.github.md5sha256.realty")
+                    .reconcileFiles(CONFIG_FILES)
+                    .handlers(RealtyCommands.handlers())
+                    .resolvers(RealtyCommands.resolvers())
+                    .listeners(RealtyListeners.listeners())
+                    .dialogs(SearchDialogHandler.class, SubregionDialogHandler.class)
+                    .build();
+            this.databaseSettings = this.hibernia.configuration(DatabaseSettings.class);
+            this.settings.set(this.hibernia.configuration(Settings.class));
+            this.regionFlagSettings.set(this.hibernia.configuration(RegionProfileSettings.class));
+            this.realtyTags.set(new RealtyTags(this.hibernia.configuration(RegionTagSettings.class)));
+            this.taxSettings.set(this.hibernia.configuration(TaxSettings.class));
             registerTagPermissions(this.realtyTags.get());
             configureRegionFlagService(this.regionFlagSettings.get());
 
@@ -298,13 +293,6 @@ public final class Realty extends JavaPlugin {
                 this, this.regionProfileService, this.executorState, this.logic,
                 this.signTextApplicator, this.signCache);
         this.profileApplicator.applyAll(this.settings.get().profileReapplyPerTick());
-        getServer().getPluginManager().registerEvents(
-                new SignInteractionListener(this.database, this.logic,
-                        this.regionProfileService, this.executorState, this.signCache,
-                        this.signTextApplicator, this.messageContainer), this);
-        if (getServer().getPluginManager().isPluginEnabled("Treasury")) {
-            registerTreasuryTaxProvider();
-        }
         this.paperApi = new RealtyPaperApiImpl(
                 this.logic, economyProvider, this.executorState, this.database,
                 this.regionProfileService, this.signTextApplicator, this.signCache,
@@ -318,11 +306,15 @@ public final class Realty extends JavaPlugin {
                 new ModuleLoader(getDataFolder().toPath().resolve("modules")),
                 Realty.class.getName(),
                 getLogger());
+        // Built here rather than inside registerCommands so the injector can bind them: the
+        // subregion flow reaches the wand from both a command and a listener.
+        this.subregionWand = new SubregionWand(this, this.settings);
+        this.subregionWandManager = new SubregionWandManager();
+        this.injector = createInjector(economyProvider, safeLocationFinder);
         scheduleTasks();
-        registerCommands(this.paperApi,
-                this.executorState,
-                this.messageContainer,
-                safeLocationFinder);
+        this.injector.getInstance(CommandManager.class).registerAll();
+        this.injector.getInstance(ListenerManager.class).registerAll();
+        registerConditionalListeners();
         getServer().getServicesManager()
                 .register(RealtyBackend.class, this.logic, this, ServicePriority.Normal);
         getServer().getServicesManager()
@@ -368,6 +360,55 @@ public final class Realty extends JavaPlugin {
             }
         }
         getLogger().info("Plugin disabled successfully");
+    }
+
+    /**
+     * Builds the Guice injector over the service graph {@link #onEnable()} has just finished
+     * constructing.
+     *
+     * <p>The Hibernia module itself was built in {@link #onLoad()}, because configuration has to
+     * be readable before the plugin decides whether it can enable.</p>
+     */
+    private @NotNull Injector createInjector(@NotNull EconomyProvider economyProvider,
+                                             @NotNull SafeLocationFinder safeLocationFinder) {
+        Injector created = Guice.createInjector(this.hibernia, new RealtyModule(
+                this,
+                this.messageContainer,
+                this.settings,
+                this.regionFlagSettings,
+                this.realtyTags,
+                this.taxSettings,
+                this.executorState,
+                this.database,
+                this.logic,
+                this.paperApi,
+                economyProvider,
+                this.partyService,
+                this.regionProfileService,
+                this.signCache,
+                this.signTextApplicator,
+                this.profileApplicator,
+                this.eventDispatch,
+                this.nameResolver,
+                safeLocationFinder,
+                this.subregionWand,
+                this.subregionWandManager,
+                this.moduleManager));
+        this.configuration = created.getInstance(ConfigurationLoader.class);
+        this.messageContainer = created.getInstance(Message.class);
+        return created;
+    }
+
+    /**
+     * Listeners the framework cannot register for us.
+     *
+     * <p>{@code ListenerManager} registers its set unconditionally; the property-tax listener only
+     * makes sense when Treasury is present, so it stays behind the same check it always had.</p>
+     */
+    private void registerConditionalListeners() {
+        if (getServer().getPluginManager().isPluginEnabled("Treasury")) {
+            registerTreasuryTaxProvider();
+        }
     }
 
     private void registerTreasuryTaxProvider() {
@@ -428,14 +469,14 @@ public final class Realty extends JavaPlugin {
                         if (auction.winnerId() != null) {
                             this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                     List.of(auction.winnerId()),
-                                    this.messageContainer.messageFor(MessageKeys.NOTIFICATION_AUCTION_WON,
-                                            Placeholder.unparsed("region", auction.worldGuardRegionId())),
+                                    this.messageContainer.component(MessageKeys.NOTIFICATION_AUCTION_WON,
+                                            "region", auction.worldGuardRegionId()),
                                     wgRegion));
                         } else {
                             this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                     List.of(auction.auctioneerId()),
-                                    this.messageContainer.messageFor(MessageKeys.NOTIFICATION_AUCTION_ENDED_NO_BIDS,
-                                            Placeholder.unparsed("region", auction.worldGuardRegionId())),
+                                    this.messageContainer.component(MessageKeys.NOTIFICATION_AUCTION_ENDED_NO_BIDS,
+                                            "region", auction.worldGuardRegionId()),
                                     wgRegion));
                         }
                         if (wgRegion != null) {
@@ -452,10 +493,9 @@ public final class Realty extends JavaPlugin {
                         WorldGuardRegion wgRegion = resolveRegion(payment.worldId(), payment.regionId());
                         this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                 List.of(payment.bidderId()),
-                                this.messageContainer.messageFor(MessageKeys.NOTIFICATION_BID_PAYMENT_EXPIRED,
-                                        Placeholder.unparsed("region", payment.regionId()),
-                                        Placeholder.unparsed("amount",
-                                                CurrencyFormatter.format(payment.refundAmount()))),
+                                this.messageContainer.component(MessageKeys.NOTIFICATION_BID_PAYMENT_EXPIRED,
+                                        "region", payment.regionId(),
+                                        "amount", CurrencyFormatter.format(payment.refundAmount())),
                                 wgRegion));
                     }
                 });
@@ -467,10 +507,9 @@ public final class Realty extends JavaPlugin {
                         WorldGuardRegion wgRegion = resolveRegion(payment.worldId(), payment.regionId());
                         this.eventDispatch.fireSync(new RealtyNotificationEvent(
                                 List.of(payment.offererId()),
-                                this.messageContainer.messageFor(MessageKeys.NOTIFICATION_OFFER_PAYMENT_EXPIRED,
-                                        Placeholder.unparsed("region", payment.regionId()),
-                                        Placeholder.unparsed("amount",
-                                                CurrencyFormatter.format(payment.refundAmount()))),
+                                this.messageContainer.component(MessageKeys.NOTIFICATION_OFFER_PAYMENT_EXPIRED,
+                                        "region", payment.regionId(),
+                                        "amount", CurrencyFormatter.format(payment.refundAmount())),
                                 wgRegion));
                     }
                 });
@@ -591,30 +630,10 @@ public final class Realty extends JavaPlugin {
         }
     }
 
-    private Settings loadSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("settings");
-        return settingsRoot.get(Settings.class);
-    }
 
-    private DatabaseSettings loadDatabaseSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("database");
-        return settingsRoot.get(DatabaseSettings.class);
-    }
 
-    private RegionProfileSettings loadRegionFlagSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("profiles");
-        return settingsRoot.get(RegionProfileSettings.class);
-    }
 
-    private RegionTagSettings loadRegionTagSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("region-tags");
-        return settingsRoot.get(RegionTagSettings.class);
-    }
 
-    private TaxSettings loadTaxSettings() throws IOException {
-        ConfigurationNode settingsRoot = copyDefaultsYaml("taxes");
-        return settingsRoot.get(TaxSettings.class);
-    }
 
     private void unregisterTagPermissions(@NotNull RealtyTags realtyTags) {
         PluginManager pluginManager = getServer().getPluginManager();
@@ -662,11 +681,6 @@ public final class Realty extends JavaPlugin {
         });
     }
 
-    private void reloadMessages() throws IOException {
-        ConfigurationNode node = copyDefaultsYaml("messages");
-        this.messageContainer.load(node);
-    }
-
     private void configureRegionFlagService(@NotNull RegionProfileSettings settings) {
         this.regionProfileService.clearGroupedFlagProfiles();
         this.regionProfileService.clearGroupedSignProfiles();
@@ -702,17 +716,23 @@ public final class Realty extends JavaPlugin {
         }
     }
 
-    private void performReload() throws IOException {
-        this.settings.set(loadSettings());
-        this.regionFlagSettings.set(loadRegionFlagSettings());
+    /** Re-reads every configuration file and refreshes the derived state. Driven by {@code /realty reload}. */
+    public void performReload() throws IOException {
+        // One re-read of every file, then a single atomic swap of the whole component set, so a
+        // command running mid-reload never sees settings from one file paired with tags from
+        // another. The AtomicReferences below are re-pointed at the new snapshot; consumers hold
+        // the holder, not the value, so they pick the new values up without being re-injected.
+        this.configuration.reload();
+        this.settings.set(this.configuration.getComponent(Settings.class));
+        this.regionFlagSettings.set(this.configuration.getComponent(RegionProfileSettings.class));
         unregisterTagPermissions(this.realtyTags.get());
-        this.realtyTags.set(new RealtyTags(loadRegionTagSettings()));
+        this.realtyTags.set(new RealtyTags(this.configuration.getComponent(RegionTagSettings.class)));
         registerTagPermissions(this.realtyTags.get());
         configureRegionFlagService(this.regionFlagSettings.get());
         this.profileApplicator.applyAll(this.settings.get().profileReapplyPerTick());
-        this.taxSettings.set(loadTaxSettings());
+        this.taxSettings.set(this.configuration.getComponent(TaxSettings.class));
         this.partyService.refresh();
-        reloadMessages();
+        this.messageContainer.reload();
         warnOrphanedTags();
         reloadModules();
     }
@@ -775,111 +795,6 @@ public final class Realty extends JavaPlugin {
         });
     }
 
-    private void registerCommands(
-            @NotNull RealtyPaperApi paperApi,
-            @NotNull ExecutorState executorState,
-            @NotNull MessageContainer messageContainer,
-            @NotNull SafeLocationFinder safeLocationFinder
-    ) {
-        String version = getPluginMeta().getVersion();
-        var helpCommand = new HelpCommand(messageContainer);
-
-        SubregionWand subregionWand = new SubregionWand(this, this.settings);
-        SubregionWandManager subregionWandManager = new SubregionWandManager();
-        SubregionDialog subregionDialog = new SubregionDialog(paperApi, executorState,
-                this.database, subregionWandManager, this.settings, this.realtyTags,
-                messageContainer);
-        PluginManager pluginManager = getServer().getPluginManager();
-        pluginManager.registerEvents(
-                new SubregionWandListener(this, subregionWand, subregionWandManager,
-                        messageContainer), this);
-        pluginManager.registerEvents(
-                new RegionNotificationListener(this.eventDispatch, messageContainer,
-                        this.partyService), this);
-
-        List<CustomCommandBean> commands = List.of(
-                new VersionCommand(version),
-                new AddCommand(messageContainer),
-                new AgentInviteCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentInviteAcceptCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentInviteRejectCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentInviteWithdrawCommand(paperApi, messageContainer, this.eventDispatch),
-                new AgentRemoveCommand(paperApi, messageContainer, this.eventDispatch),
-                new AuctionCommandGroup(paperApi,
-                        this.settings,
-                        messageContainer,
-                        this.eventDispatch,
-                        this.partyService),
-                new BuyCommand(paperApi, messageContainer, this.eventDispatch),
-                new CreateCommand(paperApi, this.settings, messageContainer, this.eventDispatch,
-                        this.partyService),
-                new RegisterCommand(paperApi, this.settings, messageContainer, this.eventDispatch,
-                        this.partyService),
-                new DeleteCommand(paperApi, messageContainer, this.eventDispatch),
-                new HistoryCommand(paperApi, this.settings, messageContainer, this.partyService),
-                new InfoCommand(paperApi,
-                        this.settings,
-                        this.database,
-                        this.realtyTags,
-                        messageContainer,
-                        this.partyService),
-                new ListCommand(paperApi, messageContainer, this.partyService),
-                new OfferCommandGroup(paperApi,
-                        messageContainer,
-                        this.eventDispatch,
-                        this.partyService,
-                        executorState),
-                new ExtendCommand(paperApi, messageContainer, this.eventDispatch),
-                new RentCommand(paperApi, messageContainer, this.eventDispatch),
-                new RentableCommand(paperApi, messageContainer),
-                new UnrentCommand(paperApi, messageContainer, this.eventDispatch),
-                new SetCommandGroup(paperApi, messageContainer, this.eventDispatch, this.partyService),
-                new ModifyCommandGroup(paperApi, messageContainer, this.eventDispatch, this.partyService),
-                new TerminateCommand(paperApi, messageContainer, this.eventDispatch),
-                new TransferCommand(paperApi, messageContainer, this.eventDispatch, this.partyService),
-                new UnsetCommandGroup(paperApi, messageContainer),
-                new GovernmentCommandGroup(this.partyService, executorState, messageContainer),
-                new ModuleCommandGroup(this.moduleManager, executorState, messageContainer),
-                new ReloadCommand(executorState, () -> {
-                    performReload();
-                    return null;
-                }, messageContainer),
-                new RemoveCommand(messageContainer),
-                new SignCommand(paperApi, executorState, messageContainer, this.partyService),
-                new TeleportCommand(getLogger(), paperApi, this.settings, messageContainer, safeLocationFinder),
-                new SubregionCommandGroup(subregionWand, subregionWandManager, subregionDialog,
-                        messageContainer),
-                new CleanupCommandGroup(this.database,
-                        executorState,
-                        this.realtyTags,
-                        messageContainer),
-                new TagCommandGroup(this.database,
-                        executorState,
-                        this.realtyTags,
-                        messageContainer),
-                new SearchCommand(
-                        new SearchDialog(this.database, executorState,
-                                this.realtyTags, messageContainer),
-                        messageContainer)
-        );
-
-        var manager = PaperCommandManager.builder(PaperSimpleSenderMapper.simpleSenderMapper())
-                .executionCoordinator(ExecutionCoordinator.simpleCoordinator())
-                .buildOnEnable(this);
-        manager.brigadierManager().setNativeNumberSuggestions(true);
-        Command.Builder<Source> rootBuilder = manager.commandBuilder("realty", "rl");
-        // Register help commands and proxy the root literal to the base help command
-        List<Command<? extends Source>> helpCommands = helpCommand.commands(rootBuilder);
-        for (Command<? extends Source> cmd : helpCommands) {
-            manager.command(cmd);
-        }
-        manager.command(rootBuilder.proxies(helpCommands.getFirst()));
-        for (CustomCommandBean bean : commands) {
-            for (Command<? extends Source> cmd : bean.commands(rootBuilder)) {
-                manager.command(cmd);
-            }
-        }
-    }
 
     private void copyResourceTemplate(@NotNull String resourceName,
                                       @NotNull String targetName) throws IOException {
@@ -895,43 +810,5 @@ public final class Realty extends JavaPlugin {
         }
     }
 
-    private ConfigurationNode copyDefaultsYaml(@NotNull String resourceName) throws IOException {
-        String fileName = resourceName + ".yml";
-        File file = new File(getDataFolder(), fileName);
-        if (!file.exists()) {
-            try (FileOutputStream fileOutputStream = new FileOutputStream(file);
-                 InputStream inputStream = getResource(fileName)) {
-                if (inputStream == null) {
-                    getLogger().severe("Failed to copy default resource: " + fileName);
-                } else {
-                    inputStream.transferTo(fileOutputStream);
-                }
-            }
-        }
-        YamlConfigurationLoader existingLoader = yamlLoader()
-                .file(file)
-                .build();
-        ConfigurationNode existingRoot = existingLoader.load();
-        try (InputStream defaultStream = getResource(fileName)) {
-            if (defaultStream != null) {
-                YamlConfigurationLoader defaultsLoader = yamlLoader()
-                        .source(() -> new BufferedReader(
-                                new InputStreamReader(defaultStream, StandardCharsets.UTF_8)))
-                        .build();
-                ConfigurationNode defaultsRoot = defaultsLoader.load();
-                existingRoot.mergeFrom(defaultsRoot);
-                existingLoader.save(existingRoot);
-            }
-        }
-        return existingRoot;
-    }
 
-
-    private YamlConfigurationLoader.Builder yamlLoader() {
-        return YamlConfigurationLoader.builder()
-                .defaultOptions(options -> options.serializers(builder -> builder
-                        .register(Component.class, ComponentSerializer.MINI_MESSAGE)
-                        .register(SimpleDateFormat.class, SimpleDateFormatSerializer.INSTANCE)))
-                .nodeStyle(NodeStyle.BLOCK);
-    }
 }

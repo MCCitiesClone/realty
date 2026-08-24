@@ -1,33 +1,36 @@
 package io.github.md5sha256.realty.settings;
 
-import io.github.md5sha256.realty.api.RegionState;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationValue;
+import io.paradaux.hibernia.framework.configurator.annotations.ConfigurationComponent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.configurate.objectmapping.ConfigSerializable;
-import org.spongepowered.configurate.objectmapping.meta.Required;
-import org.spongepowered.configurate.objectmapping.meta.Setting;
 
 import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-@ConfigSerializable
+@ConfigurationComponent(file = "settings.yml")
 public record Settings(
-        @Setting("default-freehold-authority-uuid") @Required @NotNull UUID defaultFreeholdAuthority,
-        @Setting("default-freehold-titleholder-uuid") @Nullable UUID defaultFreeholdTitleholder,
-        @Setting("default-leasehold-authority-uuid") @Required @NotNull UUID defaultLeaseholdAuthority,
-        @Setting("date-format") @Required @NotNull SimpleDateFormat dateFormat,
-        @Setting("profile-reapply-per-tick") int profileReapplyPerTick,
-        @Setting("subregion-min-volume") int subregionMinVolume,
-        @Setting("offer-payment-duration-seconds") long offerPaymentDurationSeconds,
-        @Setting("lease-termination-notice-seconds") long terminationNoticeSeconds,
-        @Setting("subregion-tag-blacklist") @NotNull List<String> subregionTagBlacklist,
-        @Setting("subregion-wand-material") @NotNull String subregionWandMaterial,
-        @Setting("teleportation-starting-height") int teleportStartHeight
+        @ConfigurationValue(path = "default-freehold-authority-uuid") @NotNull UUID defaultFreeholdAuthority,
+        @ConfigurationValue(path = "default-freehold-titleholder-uuid") @Nullable UUID defaultFreeholdTitleholder,
+        @ConfigurationValue(path = "default-leasehold-authority-uuid") @NotNull UUID defaultLeaseholdAuthority,
+        @ConfigurationValue(path = "date-format") @NotNull String dateFormatPattern,
+        @ConfigurationValue(path = "profile-reapply-per-tick") int profileReapplyPerTick,
+        @ConfigurationValue(path = "subregion-min-volume") int subregionMinVolume,
+        @ConfigurationValue(path = "offer-payment-duration-seconds") long offerPaymentDurationSeconds,
+        @ConfigurationValue(path = "lease-termination-notice-seconds") long terminationNoticeSeconds,
+        @ConfigurationValue(path = "subregion-tag-blacklist") @NotNull List<String> subregionTagBlacklist,
+        @ConfigurationValue(path = "subregion-wand-material") @NotNull String subregionWandMaterial,
+        @ConfigurationValue(path = "teleportation-starting-height") int teleportStartHeight
 ) {
 
+    /** Fallback matching the shipped settings.yml, used when the pattern is unset or unparseable. */
+    public static final String DEFAULT_DATE_FORMAT = "EEE, d MMMM yyyy (HH:mm)";
+
     public Settings {
+        if (dateFormatPattern == null || dateFormatPattern.isBlank()) {
+            dateFormatPattern = DEFAULT_DATE_FORMAT;
+        }
         if (profileReapplyPerTick <= 0) {
             profileReapplyPerTick = 10;
         }
@@ -45,6 +48,24 @@ public record Settings(
         }
         if (subregionWandMaterial == null || subregionWandMaterial.isBlank()) {
             subregionWandMaterial = "GOLDEN_AXE";
+        }
+    }
+
+    /**
+     * A formatter for {@code date-format}.
+     *
+     * <p>Built per call on purpose: {@link SimpleDateFormat} is not thread-safe, and Realty
+     * formats dates from command handlers that complete on database threads as well as from the
+     * main thread. A single shared instance would be a data race.</p>
+     *
+     * <p>An unparseable pattern falls back to {@link #DEFAULT_DATE_FORMAT} rather than throwing
+     * from deep inside a command.</p>
+     */
+    public @NotNull SimpleDateFormat dateFormat() {
+        try {
+            return new SimpleDateFormat(this.dateFormatPattern);
+        } catch (IllegalArgumentException invalidPattern) {
+            return new SimpleDateFormat(DEFAULT_DATE_FORMAT);
         }
     }
 }
