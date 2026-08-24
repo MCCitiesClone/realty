@@ -14,7 +14,6 @@ import io.github.md5sha256.realty.command.util.SafeLocationFinder;
 import io.github.md5sha256.realty.database.Database;
 import io.github.md5sha256.realty.economy.EconomyProvider;
 import io.github.md5sha256.realty.event.RealtyEventDispatch;
-import io.paradaux.hibernia.framework.i18n.Message;
 import io.github.md5sha256.realty.party.PartyService;
 import io.github.md5sha256.realty.settings.RealtyTags;
 import io.github.md5sha256.realty.settings.RegionProfileSettings;
@@ -44,7 +43,6 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class RealtyModule extends AbstractModule {
 
     private final Realty plugin;
-    private final Message messages;
     private final AtomicReference<Settings> settings;
     private final AtomicReference<RegionProfileSettings> regionProfileSettings;
     private final AtomicReference<RealtyTags> realtyTags;
@@ -67,7 +65,6 @@ public final class RealtyModule extends AbstractModule {
     private final ModuleLifecycleManager<Realty> moduleManager;
 
     RealtyModule(@NotNull Realty plugin,
-                 @NotNull Message messages,
                  @NotNull AtomicReference<Settings> settings,
                  @NotNull AtomicReference<RegionProfileSettings> regionProfileSettings,
                  @NotNull AtomicReference<RealtyTags> realtyTags,
@@ -89,7 +86,6 @@ public final class RealtyModule extends AbstractModule {
                  @NotNull SubregionWandManager subregionWandManager,
                  @NotNull ModuleLifecycleManager<Realty> moduleManager) {
         this.plugin = plugin;
-        this.messages = messages;
         this.settings = settings;
         this.regionProfileSettings = regionProfileSettings;
         this.realtyTags = realtyTags;
@@ -118,7 +114,9 @@ public final class RealtyModule extends AbstractModule {
         // Deliberately no Logger binding: Guice supplies one of its own, and binding it here
         // as well fails injector creation with "Logger was bound multiple times". A class
         // that wants the plugin's logger injects Realty and asks for it.
-        bind(Message.class).toInstance(this.messages);
+        // Deliberately no Message binding either: HiberniaModule binds it as an eager
+        // singleton, and Realty's own field is not populated until after the injector
+        // hands the instance back -- binding it here bound null and clashed besides.
         bind(ExecutorState.class).toInstance(this.executorState);
         bind(Database.class).toInstance(this.database);
         bind(RealtyBackend.class).toInstance(this.backend);

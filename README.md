@@ -40,6 +40,24 @@ Other artifacts:
 | `realty-paper` | Main Paper plugin |
 | `realty-paper-plan-extension` | Optional [Plan](https://github.com/plan-player-analytics/Plan) integration |
 
+### Runtime adapters
+
+Adapters are Realty *modules*, not Paper plugins. They carry a `module-manifest.yml` rather than a
+`plugin.yml`, and Realty loads them itself from `plugins/Realty/modules/`.
+
+**Do not put an adapter jar in `plugins/`.** Paper will try to load it as a plugin and fail with
+*"does not contain a paper-plugin.yml or plugin.yml"*. If that has already happened, remove the jar
+from `plugins/` and also delete the stale `plugins/.paper-remapped/<jar-name>/` cache entry, which
+keeps reproducing the error on its own.
+
+| Adapter | Requires | Installation |
+|---------|----------|--------------|
+| `chat-adapter` | — | Bundled; written to `plugins/Realty/modules/chat-adapter.jar` on first start |
+| `essentials-adapter` | EssentialsX | Build it and copy it to `plugins/Realty/modules/essentials-adapter.jar` |
+
+The bundled adapter is only written when the file is absent, so removing or replacing one is a
+choice that survives restarts.
+
 ## Upgrading from 1.4.9
 
 Configuration keeps its current layout: `settings.yml`, `database.yml`, `profiles.yml`,
