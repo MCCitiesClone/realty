@@ -373,7 +373,6 @@ public final class Realty extends JavaPlugin {
                                              @NotNull SafeLocationFinder safeLocationFinder) {
         Injector created = Guice.createInjector(this.hibernia, new RealtyModule(
                 this,
-                this.messageContainer,
                 this.settings,
                 this.regionFlagSettings,
                 this.realtyTags,
